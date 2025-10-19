@@ -21,27 +21,6 @@
             <items>
                 <menuItem title="Space Agent v1.0" id="1Xt-HY-uBw"/>
                 <menuItem isSeparatorItem="YES" id="VOq-y0-SEH"/>
-                <menuItem title="Set Current Space to 1" id="2Xt-HY-uB1">
-                    <connections>
-                        <action selector="resetToSpace1:" target="Voe-Tx-rLC" id="Te7-pn-YzF1"/>
-                    </connections>
-                </menuItem>
-                <menuItem title="Set Current Space to 2" id="2Xt-HY-uB2">
-                    <connections>
-                        <action selector="resetToSpace2:" target="Voe-Tx-rLC" id="Te7-pn-YzF2"/>
-                    </connections>
-                </menuItem>
-                <menuItem title="Set Current Space to 3" id="2Xt-HY-uB3">
-                    <connections>
-                        <action selector="resetToSpace3:" target="Voe-Tx-rLC" id="Te7-pn-YzF3"/>
-                    </connections>
-                </menuItem>
-                <menuItem title="Set Current Space to 4" id="2Xt-HY-uB4">
-                    <connections>
-                        <action selector="resetToSpace4:" target="Voe-Tx-rLC" id="Te7-pn-YzF4"/>
-                    </connections>
-                </menuItem>
-                <menuItem isSeparatorItem="YES" id="VOq-y0-SEH2"/>
                 <menuItem title="Quit Space Agent" keyEquivalent="q" id="4sb-4s-VLi">
                     <connections>
                         <action selector="quitClicked:" target="Voe-Tx-rLC" id="Te7-pn-YzF"/>

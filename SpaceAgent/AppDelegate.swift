@@ -45,25 +45,6 @@ class AppDelegate: NSObject, NSApplicationDelegate, SpaceMonitorDelegate {
         NSApplication.shared.terminate(self)
     }
 
-    @IBAction func resetToSpace1(_ sender: NSMenuItem) {
-        spaceMonitor.setCurrentSpace(1)
-        updateStatusBarTitle(with: 1)
-    }
-
-    @IBAction func resetToSpace2(_ sender: NSMenuItem) {
-        spaceMonitor.setCurrentSpace(2)
-        updateStatusBarTitle(with: 2)
-    }
-
-    @IBAction func resetToSpace3(_ sender: NSMenuItem) {
-        spaceMonitor.setCurrentSpace(3)
-        updateStatusBarTitle(with: 3)
-    }
-
-    @IBAction func resetToSpace4(_ sender: NSMenuItem) {
-        spaceMonitor.setCurrentSpace(4)
-        updateStatusBarTitle(with: 4)
-    }
 
     func applicationWillTerminate(_ aNotification: Notification) {
         spaceMonitor = nil

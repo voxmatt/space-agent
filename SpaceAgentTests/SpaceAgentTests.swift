@@ -51,18 +51,6 @@ class AppDelegateTests: XCTestCase {
         XCTAssertTrue(true)
     }
 
-    func testMenuActions() {
-        appDelegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))
-        
-        // Test menu actions
-        appDelegate.resetToSpace1(NSMenuItem())
-        appDelegate.resetToSpace2(NSMenuItem())
-        appDelegate.resetToSpace3(NSMenuItem())
-        appDelegate.resetToSpace4(NSMenuItem())
-        
-        // Verify the methods execute without crashing
-        XCTAssertTrue(true)
-    }
 
     func testApplicationWillTerminate() {
         appDelegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))

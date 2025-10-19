@@ -14,8 +14,17 @@ NC='\033[0m' # No Color
 echo "📱 SpaceAgent Installation Script"
 echo "================================="
 
-# Step 1: Stop any running instances
+# Step 1: Stop any running instances and disable launch agent
 echo -e "${BLUE}Step 1: Stopping any running SpaceAgent instances...${NC}"
+
+# First, unload the launch agent to prevent auto-restart
+if [ -f ~/Library/LaunchAgents/com.mtm.spaceagent.plist ]; then
+    echo "Unloading launch agent to prevent auto-restart..."
+    launchctl unload ~/Library/LaunchAgents/com.mtm.spaceagent.plist 2>/dev/null || true
+    sleep 1
+fi
+
+# Now kill any running processes
 RUNNING_PIDS=$(pgrep -f "SpaceAgent" || true)
 if [ -n "$RUNNING_PIDS" ]; then
     echo "Found running SpaceAgent processes: $RUNNING_PIDS"
@@ -28,8 +37,17 @@ if [ -n "$RUNNING_PIDS" ]; then
     if [ -n "$REMAINING_PIDS" ]; then
         echo "Force killing remaining processes..."
         pkill -9 -f "SpaceAgent" || true
+        sleep 1
     fi
-    echo -e "${GREEN}✓ Stopped all SpaceAgent processes${NC}"
+    
+    # Final verification
+    FINAL_CHECK=$(pgrep -f "SpaceAgent" || true)
+    if [ -n "$FINAL_CHECK" ]; then
+        echo -e "${YELLOW}⚠️  Warning: Some SpaceAgent processes may still be running${NC}"
+        echo "You may need to manually quit SpaceAgent from the menu bar"
+    else
+        echo -e "${GREEN}✓ Stopped all SpaceAgent processes${NC}"
+    fi
 else
     echo -e "${GREEN}✓ No SpaceAgent processes were running${NC}"
 fi
@@ -71,25 +89,29 @@ if [ ! -f "com.mtm.spaceagent.plist" ]; then
     echo -e "${YELLOW}⚠️  Warning: com.mtm.spaceagent.plist not found, skipping auto-start setup${NC}"
     echo "You can set up auto-start manually later"
 else
+    # Unload any existing launch agent first
+    launchctl unload ~/Library/LaunchAgents/com.mtm.spaceagent.plist 2>/dev/null || true
+    
+    # Copy and load the new one
     cp com.mtm.spaceagent.plist ~/Library/LaunchAgents/
     launchctl load ~/Library/LaunchAgents/com.mtm.spaceagent.plist
     echo -e "${GREEN}✓ Auto-start configured${NC}"
 fi
 
-# Step 6: Start the app
-echo -e "${BLUE}Step 6: Starting SpaceAgent...${NC}"
-echo "🚀 Launching SpaceAgent..."
-open "/Applications/SpaceAgent.app"
+# Step 6: Verify installation
+echo -e "${BLUE}Step 6: Verifying installation...${NC}"
 
-# Wait a moment for the app to start
-sleep 2
+# Wait a moment for the launch agent to start the app
+sleep 3
 
 # Check if it's running
 if pgrep -f "SpaceAgent" > /dev/null; then
     echo -e "${GREEN}✓ SpaceAgent is now running!${NC}"
+    echo "You should see the space number in your menu bar"
 else
     echo -e "${YELLOW}⚠️  SpaceAgent may not have started properly${NC}"
-    echo "Check Console.app for any error messages"
+    echo "Try manually launching it from Applications or check Console.app for errors"
+    echo "You can also run: open /Applications/SpaceAgent.app"
 fi
 
 echo ""
