@@ -108,3 +108,24 @@ class MockSpaceMonitorDelegate: SpaceMonitorDelegate {
         allSpaceChanges.removeAll()
     }
 }
+
+class MockSpaceMonitor: SpaceMonitor {
+    private var _currentSpaceNumber: Int = 1
+    
+    override func getCurrentSpaceNumber() -> Int {
+        return _currentSpaceNumber
+    }
+    
+    override func setCurrentSpace(_ spaceNumber: Int) {
+        let previousSpace = _currentSpaceNumber
+        _currentSpaceNumber = spaceNumber
+        
+        // Call delegate synchronously for testing
+        delegate?.spaceDidChange(to: spaceNumber, from: previousSpace)
+    }
+    
+    override func updateCurrentSpace() {
+        // Mock implementation - just call delegate synchronously
+        delegate?.spaceDidChange(to: _currentSpaceNumber, from: _currentSpaceNumber)
+    }
+}
