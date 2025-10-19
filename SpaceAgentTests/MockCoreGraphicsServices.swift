@@ -24,6 +24,10 @@ class MockCoreGraphicsService: CoreGraphicsServiceProtocol {
         activeDisplayCallCount += 1
         return _mockActiveDisplayIdentifier
     }
+    
+    func detectActualSpace() -> Int {
+        return 1
+    }
 
     func setupMockSpaces(currentSpaceID: Int, totalSpaces: Int = 3, displayIdentifier: String = "Main") {
         var spaces: [[String: Any]] = []

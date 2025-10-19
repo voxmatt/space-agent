@@ -17,6 +17,14 @@ A background macOS agent that monitors virtual space changes and displays the cu
    ./install.sh
    ```
 
+The installation script will:
+- Stop any running SpaceAgent instances
+- Remove old versions from Applications
+- Build the app in Release configuration
+- Install to `/Applications/SpaceAgent.app`
+- Set up auto-start via LaunchAgent
+- Launch the app immediately
+
 ## Setup
 
 After installation, SpaceAgent will automatically start monitoring your spaces and display the current space number in the menu bar.
@@ -48,12 +56,19 @@ sudo rm -rf /Applications/SpaceAgent.app
 
 ## Development
 
+### Available Scripts
+
+- **`./install.sh`** - Complete installation and setup
+- **`./test.sh`** - Run tests with syntax validation
+- **`./test.sh space`** - Run only SpaceMonitor tests
+- **`./test.sh integration`** - Run only integration tests
+
 ### Testing
 
-The project includes comprehensive tests covering all critical code paths:
+The project includes comprehensive testing with syntax validation and test execution:
 
 ```bash
-# Run all tests
+# Run all tests (includes syntax validation + test execution)
 ./test.sh
 
 # Run specific test suites
@@ -61,11 +76,12 @@ The project includes comprehensive tests covering all critical code paths:
 ./test.sh integration # End-to-end integration tests
 ```
 
-### Test Coverage
+### Test Features
 
-- **SpaceMonitor**: Core space detection logic, space change notifications, dynamic space discovery
-- **Application Lifecycle**: Initialization, delegation patterns, memory management
-- **Integration**: End-to-end workflows, failure scenarios, edge cases
+- **Syntax Validation**: Swift compiler checks all source files before testing
+- **Test Structure Validation**: Ensures proper XCTest setup and imports
+- **Test Metrics**: Counts test methods and validates test structure
+- **Comprehensive Coverage**: SpaceMonitor, Application Lifecycle, and Integration tests
 
 ### Architecture
 
