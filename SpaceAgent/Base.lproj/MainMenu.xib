@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<document type="com.apple.InterfaceBuilder3.Cocoa.XIB" version="3.0" toolsVersion="22155" targetRuntime="MacOSX.Cocoa" propertyAccessControl="none" useAutolayout="YES" customObjectInstantitationMethod="direct">
+    <dependencies>
+        <plugIn identifier="com.apple.InterfaceBuilder.CocoaPlugin" version="22155"/>
+        <capability name="documents saved in the Xcode 8 format" minToolsVersion="8.0"/>
+    </dependencies>
+    <objects>
+        <customObject id="-2" userLabel="File's Owner" customClass="NSApplication">
+            <connections>
+                <outlet property="delegate" destination="Voe-Tx-rLC" id="GzC-gU-4Uq"/>
+            </connections>
+        </customObject>
+        <customObject id="-1" userLabel="First Responder" customClass="FirstResponder"/>
+        <customObject id="-3" userLabel="Application" customClass="NSObject"/>
+        <customObject id="Voe-Tx-rLC" customClass="AppDelegate" customModule="SpaceAgent" customModuleProvider="target">
+            <connections>
+                <outlet property="statusMenu" destination="uQy-DD-JDr" id="R2o-Ry-Fzs"/>
+            </connections>
+        </customObject>
+        <menu title="Status" id="uQy-DD-JDr">
+            <items>
+                <menuItem title="Space Agent v1.0" id="1Xt-HY-uBw"/>
+                <menuItem isSeparatorItem="YES" id="VOq-y0-SEH"/>
+                <menuItem title="Set Current Space to 1" id="2Xt-HY-uB1">
+                    <connections>
+                        <action selector="resetToSpace1:" target="Voe-Tx-rLC" id="Te7-pn-YzF1"/>
+                    </connections>
+                </menuItem>
+                <menuItem title="Set Current Space to 2" id="2Xt-HY-uB2">
+                    <connections>
+                        <action selector="resetToSpace2:" target="Voe-Tx-rLC" id="Te7-pn-YzF2"/>
+                    </connections>
+                </menuItem>
+                <menuItem title="Set Current Space to 3" id="2Xt-HY-uB3">
+                    <connections>
+                        <action selector="resetToSpace3:" target="Voe-Tx-rLC" id="Te7-pn-YzF3"/>
+                    </connections>
+                </menuItem>
+                <menuItem title="Set Current Space to 4" id="2Xt-HY-uB4">
+                    <connections>
+                        <action selector="resetToSpace4:" target="Voe-Tx-rLC" id="Te7-pn-YzF4"/>
+                    </connections>
+                </menuItem>
+                <menuItem isSeparatorItem="YES" id="VOq-y0-SEH2"/>
+                <menuItem title="Quit Space Agent" keyEquivalent="q" id="4sb-4s-VLi">
+                    <connections>
+                        <action selector="quitClicked:" target="Voe-Tx-rLC" id="Te7-pn-YzF"/>
+                    </connections>
+                </menuItem>
+            </items>
+        </menu>
+    </objects>
+</document>
