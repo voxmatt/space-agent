@@ -156,9 +156,40 @@ class SpaceMonitor {
 
     init(coreGraphicsService: CoreGraphicsServiceProtocol = RealCoreGraphicsService()) {
         self.coreGraphicsService = coreGraphicsService
+        
+        // Check for multiple instances
+        checkForMultipleInstances()
+        
         setupMonitoring()
         // Detect initial space
         currentSpaceNumber = detectCurrentSpaceNumber()
+    }
+    
+    private func checkForMultipleInstances() {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/ps")
+        process.arguments = ["aux"]
+        
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        
+        do {
+            try process.run()
+            process.waitUntilExit()
+            
+            let data = pipe.fileHandleForReading.readDataToEndOfFile()
+            let output = String(data: data, encoding: .utf8) ?? ""
+            
+            let spaceAgentLines = output.components(separatedBy: .newlines)
+                .filter { $0.contains("SpaceAgent") && !$0.contains("grep") }
+            
+            if spaceAgentLines.count > 1 {
+                let warningMsg = "⚠️  WARNING: Multiple SpaceAgent instances detected (\(spaceAgentLines.count)). This may cause conflicts.\n"
+                print(warningMsg)
+            }
+        } catch {
+            // If we can't check, just continue
+        }
     }
 
     deinit {
@@ -198,12 +229,88 @@ class SpaceMonitor {
             writeToDebugFile(debugMsg)
             print("Space change detected: \(previousSpace) -> \(currentSpaceNumber)")
 
+            // Trigger shortcut for space change
+            triggerShortcut(for: currentSpaceNumber, from: previousSpace)
+
             DispatchQueue.main.async {
                 self.delegate?.spaceDidChange(to: self.currentSpaceNumber, from: previousSpace)
             }
         } else {
             let debugMsg = "Space change notification received but no actual change detected (detected: \(detectedSpace), current: \(currentSpaceNumber))\n"
             writeToDebugFile(debugMsg)
+        }
+    }
+    
+    /// Triggers a shortcut using the command line tool when space changes
+    private func triggerShortcut(for spaceNumber: Int, from previousSpace: Int) {
+        // You can configure which shortcut to run here
+        // For now, we'll use a placeholder - you can change this to any shortcut name
+        let shortcutName = "Change default browser when space changes" // Change this to your desired shortcut name
+        
+        // Run shortcut execution asynchronously to prevent hanging
+        DispatchQueue.global(qos: .background).async { [weak self] in
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/shortcuts")
+            
+            // Pass the space number as simple text input
+            let spaceNumberText = String(spaceNumber)
+            
+            do {
+                // Create a temporary file with just the space number
+                let tempFile = FileManager.default.temporaryDirectory.appendingPathComponent("space_number.txt")
+                try spaceNumberText.write(to: tempFile, atomically: true, encoding: .utf8)
+                
+                let debugMsg = "📤 Sending space number to shortcut: \(spaceNumberText)\n"
+                self?.writeToDebugFile(debugMsg)
+                print("📤 Sending space number to shortcut: \(spaceNumberText)")
+                
+                process.arguments = ["run", shortcutName, "--input-path", tempFile.path]
+                
+                let pipe = Pipe()
+                process.standardOutput = pipe
+                process.standardError = pipe
+                
+                let startMsg = "🚀 Starting shortcut execution: \(shortcutName)\n"
+                self?.writeToDebugFile(startMsg)
+                print("🚀 Starting shortcut execution: \(shortcutName)")
+                
+                try process.run()
+                
+                // Set a timeout to prevent hanging
+                let timeout: TimeInterval = 10.0 // 10 second timeout
+                let startTime = Date()
+                
+                while process.isRunning {
+                    if Date().timeIntervalSince(startTime) > timeout {
+                        print("⏰ Shortcut execution timed out after \(timeout) seconds")
+                        process.terminate()
+                        break
+                    }
+                    usleep(100000) // Sleep for 0.1 seconds
+                }
+                
+                if process.isRunning {
+                    process.terminate()
+                    let timeoutMsg = "⏰ Shortcut '\(shortcutName)' timed out and was terminated\n"
+                    self?.writeToDebugFile(timeoutMsg)
+                    print("⏰ Shortcut '\(shortcutName)' timed out and was terminated")
+                } else {
+                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                    let output = String(data: data, encoding: .utf8) ?? ""
+                    
+                    let successMsg = "✅ Shortcut '\(shortcutName)' completed. Exit code: \(process.terminationStatus). Output: \(output)\n"
+                    self?.writeToDebugFile(successMsg)
+                    print("✅ Shortcut '\(shortcutName)' completed. Exit code: \(process.terminationStatus). Output: \(output)")
+                }
+                
+                // Clean up temp file
+                try? FileManager.default.removeItem(at: tempFile)
+                
+            } catch {
+                let errorMsg = "❌ Failed to execute shortcut '\(shortcutName)': \(error)\n"
+                self?.writeToDebugFile(errorMsg)
+                print("❌ Shortcut execution failed: \(error)")
+            }
         }
     }
     

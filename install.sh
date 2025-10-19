@@ -21,23 +21,23 @@ echo -e "${BLUE}Step 1: Stopping any running SpaceAgent instances...${NC}"
 if [ -f ~/Library/LaunchAgents/com.mtm.spaceagent.plist ]; then
     echo "Unloading launch agent to prevent auto-restart..."
     launchctl unload ~/Library/LaunchAgents/com.mtm.spaceagent.plist 2>/dev/null || true
-    sleep 1
+    sleep 2
 fi
 
-# Now kill any running processes
+# Now kill any running processes (both from Applications and build directories)
 RUNNING_PIDS=$(pgrep -f "SpaceAgent" || true)
 if [ -n "$RUNNING_PIDS" ]; then
     echo "Found running SpaceAgent processes: $RUNNING_PIDS"
     echo "Stopping them..."
     pkill -f "SpaceAgent" || true
-    sleep 2
+    sleep 3
     
     # Force kill if still running
     REMAINING_PIDS=$(pgrep -f "SpaceAgent" || true)
     if [ -n "$REMAINING_PIDS" ]; then
         echo "Force killing remaining processes..."
         pkill -9 -f "SpaceAgent" || true
-        sleep 1
+        sleep 2
     fi
     
     # Final verification
@@ -45,6 +45,7 @@ if [ -n "$RUNNING_PIDS" ]; then
     if [ -n "$FINAL_CHECK" ]; then
         echo -e "${YELLOW}⚠️  Warning: Some SpaceAgent processes may still be running${NC}"
         echo "You may need to manually quit SpaceAgent from the menu bar"
+        echo "Remaining PIDs: $FINAL_CHECK"
     else
         echo -e "${GREEN}✓ Stopped all SpaceAgent processes${NC}"
     fi
@@ -104,10 +105,17 @@ echo -e "${BLUE}Step 6: Verifying installation...${NC}"
 # Wait a moment for the launch agent to start the app
 sleep 3
 
-# Check if it's running
-if pgrep -f "SpaceAgent" > /dev/null; then
-    echo -e "${GREEN}✓ SpaceAgent is now running!${NC}"
-    echo "You should see the space number in your menu bar"
+# Check if it's running and verify only one instance
+RUNNING_COUNT=$(pgrep -f "SpaceAgent" | wc -l)
+if [ "$RUNNING_COUNT" -gt 0 ]; then
+    if [ "$RUNNING_COUNT" -eq 1 ]; then
+        echo -e "${GREEN}✓ SpaceAgent is now running! (1 instance)${NC}"
+        echo "You should see the space number in your menu bar"
+    else
+        echo -e "${YELLOW}⚠️  Warning: Multiple SpaceAgent instances detected ($RUNNING_COUNT)${NC}"
+        echo "This may cause issues. Consider restarting your system or manually killing duplicates."
+        pgrep -f "SpaceAgent" | xargs ps -p
+    fi
 else
     echo -e "${YELLOW}⚠️  SpaceAgent may not have started properly${NC}"
     echo "Try manually launching it from Applications or check Console.app for errors"
