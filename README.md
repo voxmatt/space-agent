@@ -58,7 +58,8 @@ sudo rm -rf /Applications/SpaceAgent.app
 
 ### Available Scripts
 
-- **`./install.sh`** - Complete installation and setup
+- **`./install.sh`** - Complete installation with force cleanup and setup
+- **`./cleanup.sh`** - Stop all SpaceAgent instances and unload launch agent
 - **`./test.sh`** - Run tests with syntax validation
 - **`./test.sh space`** - Run only SpaceMonitor tests
 - **`./test.sh integration`** - Run only integration tests

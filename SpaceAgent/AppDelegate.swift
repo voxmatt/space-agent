@@ -8,11 +8,13 @@ class AppDelegate: NSObject, NSApplicationDelegate, SpaceMonitorDelegate {
 
     private let statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private var spaceMonitor: SpaceMonitor!
+    private var isTerminating = false
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         setupApplication()
         setupStatusItem()
         setupSpaceMonitoring()
+        setupSignalHandling()
     }
 
     private func setupApplication() {
@@ -26,27 +28,64 @@ class AppDelegate: NSObject, NSApplicationDelegate, SpaceMonitorDelegate {
     }
 
     private func setupSpaceMonitoring() {
-        spaceMonitor = SpaceMonitor()
-        spaceMonitor.delegate = self
-        updateStatusBarTitle(with: spaceMonitor.getCurrentSpaceNumber())
+        // Update menubar immediately with a default value
+        updateStatusBarTitle(with: 1)
+        
+        // Initialize space monitoring after a delay to prevent hanging
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            self.spaceMonitor = SpaceMonitor()
+            self.spaceMonitor.delegate = self
+        }
     }
 
     private func updateStatusBarTitle(with spaceNumber: Int) {
         DispatchQueue.main.async {
+            print("Updating menubar title to: \(spaceNumber)")
             if spaceNumber > 0 {
                 self.statusBarItem.button?.title = "🚀 \(spaceNumber)"
+                print("Set menubar title to: 🚀 \(spaceNumber)")
             } else {
                 self.statusBarItem.button?.title = "🚀 ?"
+                print("Set menubar title to: 🚀 ?")
+            }
+        }
+    }
+
+    private func setupSignalHandling() {
+        // Set up signal handlers for graceful termination
+        signal(SIGTERM) { _ in
+            DispatchQueue.main.async {
+                NSApplication.shared.terminate(nil)
+            }
+        }
+        
+        signal(SIGINT) { _ in
+            DispatchQueue.main.async {
+                NSApplication.shared.terminate(nil)
             }
         }
     }
 
     @IBAction func quitClicked(_ sender: NSMenuItem) {
+        gracefulTermination()
+    }
+    
+    private func gracefulTermination() {
+        guard !isTerminating else { return }
+        isTerminating = true
+        
+        print("SpaceAgent: Initiating graceful termination...")
+        
+        // Clean up space monitor
+        spaceMonitor = nil
+        
+        // Terminate the application
         NSApplication.shared.terminate(self)
     }
 
-
     func applicationWillTerminate(_ aNotification: Notification) {
+        print("SpaceAgent: Application will terminate")
+        isTerminating = true
         spaceMonitor = nil
     }
 

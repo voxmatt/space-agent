@@ -14,43 +14,73 @@ NC='\033[0m' # No Color
 echo "📱 SpaceAgent Installation Script"
 echo "================================="
 
-# Step 1: Stop any running instances and disable launch agent
-echo -e "${BLUE}Step 1: Stopping any running SpaceAgent instances...${NC}"
+# Step 1: Force cleanup all SpaceAgent instances and launch agent
+echo -e "${BLUE}Step 1: Force cleaning all SpaceAgent instances...${NC}"
 
-# First, unload the launch agent to prevent auto-restart
-if [ -f ~/Library/LaunchAgents/com.mtm.spaceagent.plist ]; then
-    echo "Unloading launch agent to prevent auto-restart..."
-    launchctl unload ~/Library/LaunchAgents/com.mtm.spaceagent.plist 2>/dev/null || true
-    sleep 2
-fi
+# Unload launch agent first
+echo "Unloading launch agent..."
+launchctl unload ~/Library/LaunchAgents/com.mtm.spaceagent.plist 2>/dev/null || true
+echo -e "${GREEN}✓ Launch agent unloaded${NC}"
 
-# Now kill any running processes (both from Applications and build directories)
+# Step 1.1: Try graceful termination first
+echo -e "${BLUE}Step 1.1: Attempting graceful termination...${NC}"
 RUNNING_PIDS=$(pgrep -f "SpaceAgent" || true)
 if [ -n "$RUNNING_PIDS" ]; then
-    echo "Found running SpaceAgent processes: $RUNNING_PIDS"
-    echo "Stopping them..."
-    pkill -f "SpaceAgent" || true
-    sleep 3
+    echo "Found SpaceAgent processes: $RUNNING_PIDS"
+    for pid in $RUNNING_PIDS; do
+        echo "Sending TERM signal to PID: $pid"
+        kill -TERM "$pid" 2>/dev/null || true
+    done
     
-    # Force kill if still running
+    # Wait a moment for graceful shutdown
+    sleep 2
+    
+    # Check if still running
     REMAINING_PIDS=$(pgrep -f "SpaceAgent" || true)
     if [ -n "$REMAINING_PIDS" ]; then
-        echo "Force killing remaining processes..."
-        pkill -9 -f "SpaceAgent" || true
-        sleep 2
-    fi
-    
-    # Final verification
-    FINAL_CHECK=$(pgrep -f "SpaceAgent" || true)
-    if [ -n "$FINAL_CHECK" ]; then
-        echo -e "${YELLOW}⚠️  Warning: Some SpaceAgent processes may still be running${NC}"
-        echo "You may need to manually quit SpaceAgent from the menu bar"
-        echo "Remaining PIDs: $FINAL_CHECK"
+        echo -e "${YELLOW}⚠️  Graceful termination failed, processes still running: $REMAINING_PIDS${NC}"
     else
-        echo -e "${GREEN}✓ Stopped all SpaceAgent processes${NC}"
+        echo -e "${GREEN}✓ Graceful termination successful${NC}"
     fi
 else
-    echo -e "${GREEN}✓ No SpaceAgent processes were running${NC}"
+    echo -e "${GREEN}✓ No SpaceAgent processes found${NC}"
+fi
+
+# Step 1.2: Force kill with SIGKILL
+echo -e "${BLUE}Step 1.2: Force killing with SIGKILL...${NC}"
+REMAINING_PIDS=$(pgrep -f "SpaceAgent" || true)
+if [ -n "$REMAINING_PIDS" ]; then
+    for pid in $REMAINING_PIDS; do
+        echo "Force killing PID: $pid"
+        kill -9 "$pid" 2>/dev/null || true
+    done
+    
+    sleep 1
+    
+    # Check again
+    STILL_RUNNING=$(pgrep -f "SpaceAgent" || true)
+    if [ -n "$STILL_RUNNING" ]; then
+        echo -e "${YELLOW}⚠️  Some processes still running after SIGKILL: $STILL_RUNNING${NC}"
+    else
+        echo -e "${GREEN}✓ Force kill successful${NC}"
+    fi
+fi
+
+# Step 1.3: Use pkill as backup
+echo -e "${BLUE}Step 1.3: Using pkill as backup...${NC}"
+pkill -9 -f "SpaceAgent" 2>/dev/null || true
+sleep 1
+
+# Step 1.4: Check for any remaining processes
+echo -e "${BLUE}Step 1.4: Final verification...${NC}"
+FINAL_CHECK=$(pgrep -f "SpaceAgent" || true)
+if [ -n "$FINAL_CHECK" ]; then
+    echo -e "${RED}❌ Error: Failed to stop all SpaceAgent processes. PIDs: $FINAL_CHECK${NC}"
+    echo "These processes may be in an uninterruptible state (D state)"
+    echo "You may need to restart your system to clear them"
+    exit 1
+else
+    echo -e "${GREEN}✅ All SpaceAgent processes successfully terminated${NC}"
 fi
 
 # Step 2: Remove old version
@@ -103,6 +133,7 @@ fi
 echo -e "${BLUE}Step 6: Verifying installation...${NC}"
 
 # Wait a moment for the launch agent to start the app
+echo "⏳ Waiting for SpaceAgent to start via launch agent..."
 sleep 3
 
 # Check if it's running and verify only one instance
@@ -111,15 +142,16 @@ if [ "$RUNNING_COUNT" -gt 0 ]; then
     if [ "$RUNNING_COUNT" -eq 1 ]; then
         echo -e "${GREEN}✓ SpaceAgent is now running! (1 instance)${NC}"
         echo "You should see the space number in your menu bar"
+        echo "The app will automatically start on system boot via the launch agent"
     else
         echo -e "${YELLOW}⚠️  Warning: Multiple SpaceAgent instances detected ($RUNNING_COUNT)${NC}"
-        echo "This may cause issues. Consider restarting your system or manually killing duplicates."
+        echo "This may cause issues. The force cleanup should have prevented this."
         pgrep -f "SpaceAgent" | xargs ps -p
     fi
 else
     echo -e "${YELLOW}⚠️  SpaceAgent may not have started properly${NC}"
-    echo "Try manually launching it from Applications or check Console.app for errors"
-    echo "You can also run: open /Applications/SpaceAgent.app"
+    echo "Check Console.app for any error messages"
+    echo "You can manually launch it with: open /Applications/SpaceAgent.app"
 fi
 
 echo ""

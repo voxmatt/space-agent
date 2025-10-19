@@ -34,8 +34,177 @@ class RealCoreGraphicsService: CoreGraphicsServiceProtocol {
         let debugMsg = "Initializing RealCoreGraphicsService with real Core Graphics Services\n"
         writeToDebugFile(debugMsg)
         
-        // Build the complete space mapping during initialization
-        buildCompleteSpaceMapping()
+        // Try to get all spaces at initialization using public APIs
+        if !buildInitialSpaceMapping() {
+            // Fallback to dynamic discovery if initial mapping fails
+            buildCompleteSpaceMapping()
+        }
+    }
+    
+    /// Attempts to build space mapping using public APIs at initialization
+    /// Returns true if successful, false if we need to fall back to dynamic discovery
+    private func buildInitialSpaceMapping() -> Bool {
+        let msg = "Attempting to build initial space mapping using public APIs\n"
+        writeToDebugFile(msg)
+        
+        // Method 1: Try to get spaces from NSUserDefaults
+        if let spacesConfig = UserDefaults.standard.object(forKey: "com.apple.spaces") as? [String: Any] {
+            let configMsg = "Found spaces configuration in NSUserDefaults\n"
+            writeToDebugFile(configMsg)
+            
+            // Print the complete structure for debugging
+            let fullStructureMsg = "=== COMPLETE com.apple.spaces STRUCTURE ===\n"
+            writeToDebugFile(fullStructureMsg)
+            
+            // Print top-level keys
+            let topLevelKeysMsg = "Top-level keys: \(Array(spacesConfig.keys))\n"
+            writeToDebugFile(topLevelKeysMsg)
+            
+            // Print the entire structure recursively
+            let structureDump = dumpStructure(spacesConfig, indent: 0)
+            writeToDebugFile(structureDump)
+            
+            let endStructureMsg = "=== END com.apple.spaces STRUCTURE ===\n"
+            writeToDebugFile(endStructureMsg)
+            
+            let debugConfigMsg = "Spaces config keys: \(Array(spacesConfig.keys))\n"
+            writeToDebugFile(debugConfigMsg)
+            
+            // Parse the spaces configuration - the structure is:
+            // SpacesDisplayConfiguration.Monitors[0].Spaces
+            if let displayConfig = spacesConfig["SpacesDisplayConfiguration"] as? [String: Any] {
+                let displayConfigMsg = "Found SpacesDisplayConfiguration\n"
+                writeToDebugFile(displayConfigMsg)
+                
+                if let monitors = displayConfig["Monitors"] as? [[String: Any]] {
+                    let monitorsMsg = "Found \(monitors.count) monitors\n"
+                    writeToDebugFile(monitorsMsg)
+                    
+                    if let mainMonitor = monitors.first {
+                        let mainMonitorMsg = "Main monitor keys: \(Array(mainMonitor.keys))\n"
+                        writeToDebugFile(mainMonitorMsg)
+                        
+                        if let spaces = mainMonitor["Spaces"] as? [[String: Any]] {
+                            let spacesCountMsg = "Found \(spaces.count) spaces in configuration\n"
+                            writeToDebugFile(spacesCountMsg)
+                            
+                            var spaceIDs: [UInt32] = []
+                            
+                            for (index, space) in spaces.enumerated() {
+                                // Try to extract space ID from various possible keys
+                                var spaceID: UInt32? = nil
+                                
+                                if let managedSpaceID = space["ManagedSpaceID"] as? UInt32 {
+                                    spaceID = managedSpaceID
+                                } else if let id64 = space["id64"] as? UInt64 {
+                                    spaceID = UInt32(id64)
+                                } else if let uuid = space["uuid"] as? String, !uuid.isEmpty {
+                                    // Convert UUID to a numeric ID (simplified approach)
+                                    spaceID = UInt32(uuid.hashValue & 0xFFFFFFFF)
+                                }
+                                
+                                if let id = spaceID {
+                                    spaceIDs.append(id)
+                                    let spaceMsg = "Space \(index + 1): ManagedSpaceID \(id)\n"
+                                    writeToDebugFile(spaceMsg)
+                                }
+                            }
+                            
+                            if !spaceIDs.isEmpty {
+                                // Sort space IDs and create mapping
+                                spaceIDs.sort()
+                                
+                                for (index, spaceID) in spaceIDs.enumerated() {
+                                    let spaceNumber = index + 1
+                                    spaceIDToNumberMap[spaceID] = spaceNumber
+                                    let mappingMsg = "Mapped Space ID \(spaceID) to Space Number \(spaceNumber)\n"
+                                    writeToDebugFile(mappingMsg)
+                                }
+                                
+                                let successMsg = "Successfully built initial space mapping: \(spaceIDToNumberMap)\n"
+                                writeToDebugFile(successMsg)
+                                return true
+                            }
+                        } else {
+                            let noSpacesMsg = "No Spaces array found in main monitor\n"
+                            writeToDebugFile(noSpacesMsg)
+                        }
+                    } else {
+                        let noMainMonitorMsg = "No main monitor found\n"
+                        writeToDebugFile(noMainMonitorMsg)
+                    }
+                } else {
+                    let noMonitorsMsg = "No Monitors array found\n"
+                    writeToDebugFile(noMonitorsMsg)
+                }
+            } else {
+                let noDisplayConfigMsg = "No SpacesDisplayConfiguration found\n"
+                writeToDebugFile(noDisplayConfigMsg)
+            }
+        }
+        
+        // Method 2: Try window-based space detection
+        let windowSpaceIDs = detectSpacesUsingWindows()
+        if !windowSpaceIDs.isEmpty {
+            // Sort space IDs and create mapping
+            for (index, spaceID) in windowSpaceIDs.enumerated() {
+                let spaceNumber = index + 1
+                spaceIDToNumberMap[spaceID] = spaceNumber
+                let mappingMsg = "Window-based mapping: Space ID \(spaceID) -> Space Number \(spaceNumber)\n"
+                writeToDebugFile(mappingMsg)
+            }
+            
+            let successMsg = "Successfully built window-based space mapping: \(spaceIDToNumberMap)\n"
+            writeToDebugFile(successMsg)
+            return true
+        }
+        
+        // Method 3: Fallback to current space only
+        let connection = _CGSDefaultConnection()
+        let currentSpaceID = CGSGetActiveSpace(connection)
+        
+        let currentSpaceMsg = "Current space ID detected: \(currentSpaceID)\n"
+        writeToDebugFile(currentSpaceMsg)
+        
+        // At minimum, map the current space to 1
+        spaceIDToNumberMap[currentSpaceID] = 1
+        
+        let fallbackMsg = "Built minimal mapping with current space: \(spaceIDToNumberMap)\n"
+        writeToDebugFile(fallbackMsg)
+        
+        return true // We have at least the current space mapped
+    }
+    
+    /// Alternative method: Use window-based space detection
+    private func detectSpacesUsingWindows() -> [UInt32] {
+        let msg = "Attempting window-based space detection\n"
+        writeToDebugFile(msg)
+        
+        // Get all on-screen windows
+        guard let windowList = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] else {
+            let errorMsg = "Failed to get window list\n"
+            writeToDebugFile(errorMsg)
+            return []
+        }
+        
+        let windowCountMsg = "Found \(windowList.count) on-screen windows\n"
+        writeToDebugFile(windowCountMsg)
+        
+        // Extract space IDs from windows
+        var spaceIDs: Set<UInt32> = []
+        
+        for window in windowList {
+            if let spaceID = window["kCGWindowWorkspace"] as? UInt32 {
+                spaceIDs.insert(spaceID)
+                let windowMsg = "Window on space ID: \(spaceID)\n"
+                writeToDebugFile(windowMsg)
+            }
+        }
+        
+        let detectedSpacesMsg = "Detected spaces via windows: \(Array(spaceIDs).sorted())\n"
+        writeToDebugFile(detectedSpacesMsg)
+        
+        return Array(spaceIDs).sorted()
     }
     
     private func buildCompleteSpaceMapping() {
@@ -126,18 +295,50 @@ class RealCoreGraphicsService: CoreGraphicsServiceProtocol {
     }
     
     private func writeToDebugFile(_ message: String) {
-        let fileURL = URL(fileURLWithPath: "/tmp/spaceagent_debug.log")
-        if let data = message.data(using: .utf8) {
-            if FileManager.default.fileExists(atPath: fileURL.path) {
-                if let fileHandle = try? FileHandle(forWritingTo: fileURL) {
-                    fileHandle.seekToEndOfFile()
-                    fileHandle.write(data)
-                    fileHandle.closeFile()
+        // Simplified debug logging to prevent hanging
+        print("DEBUG: \(message.trimmingCharacters(in: .whitespacesAndNewlines))")
+    }
+    
+    /// Helper function to recursively dump the structure of a dictionary/array for debugging
+    private func dumpStructure(_ object: Any, indent: Int) -> String {
+        let indentString = String(repeating: "  ", count: indent)
+        var result = ""
+        
+        if let dictionary = object as? [String: Any] {
+            for (key, value) in dictionary {
+                if let nestedDict = value as? [String: Any] {
+                    result += "\(indentString)\(key): [Dictionary]\n"
+                    result += dumpStructure(nestedDict, indent: indent + 1)
+                } else if let nestedArray = value as? [Any] {
+                    result += "\(indentString)\(key): [Array with \(nestedArray.count) items]\n"
+                    for (index, item) in nestedArray.enumerated() {
+                        result += "\(indentString)  [\(index)]: "
+                        if let itemDict = item as? [String: Any] {
+                            result += "[Dictionary]\n"
+                            result += dumpStructure(itemDict, indent: indent + 2)
+                        } else {
+                            result += "\(item)\n"
+                        }
+                    }
+                } else {
+                    result += "\(indentString)\(key): \(value)\n"
                 }
-            } else {
-                try? data.write(to: fileURL)
             }
+        } else if let array = object as? [Any] {
+            for (index, item) in array.enumerated() {
+                result += "\(indentString)[\(index)]: "
+                if let itemDict = item as? [String: Any] {
+                    result += "[Dictionary]\n"
+                    result += dumpStructure(itemDict, indent: indent + 1)
+            } else {
+                    result += "\(item)\n"
+                }
+            }
+        } else {
+            result += "\(indentString)\(object)\n"
         }
+        
+        return result
     }
 }
 
@@ -163,6 +364,7 @@ class SpaceMonitor {
         setupMonitoring()
         // Detect initial space
         currentSpaceNumber = detectCurrentSpaceNumber()
+        print("SpaceMonitor: Initial space detected: \(currentSpaceNumber)")
     }
     
     private func checkForMultipleInstances() {
@@ -222,19 +424,20 @@ class SpaceMonitor {
         
         // Only update if we detected a valid space and it's different from current
         if detectedSpace > 0 && detectedSpace != currentSpaceNumber {
-            let previousSpace = currentSpaceNumber
+        let previousSpace = currentSpaceNumber
             currentSpaceNumber = detectedSpace
 
             let debugMsg = "Real space change detected: \(previousSpace) -> \(currentSpaceNumber)\n"
-            writeToDebugFile(debugMsg)
-            print("Space change detected: \(previousSpace) -> \(currentSpaceNumber)")
+        writeToDebugFile(debugMsg)
+        print("Space change detected: \(previousSpace) -> \(currentSpaceNumber)")
 
-            // Trigger shortcut for space change
-            triggerShortcut(for: currentSpaceNumber, from: previousSpace)
+            // Trigger shortcut for space change (temporarily disabled to prevent hanging)
+            // triggerShortcut(for: currentSpaceNumber, from: previousSpace)
 
-            DispatchQueue.main.async {
-                self.delegate?.spaceDidChange(to: self.currentSpaceNumber, from: previousSpace)
-            }
+        DispatchQueue.main.async {
+            print("SpaceMonitor: Calling delegate with space \(self.currentSpaceNumber)")
+            self.delegate?.spaceDidChange(to: self.currentSpaceNumber, from: previousSpace)
+        }
         } else {
             let debugMsg = "Space change notification received but no actual change detected (detected: \(detectedSpace), current: \(currentSpaceNumber))\n"
             writeToDebugFile(debugMsg)
@@ -278,30 +481,36 @@ class SpaceMonitor {
                 
                 // Set a timeout to prevent hanging
                 let timeout: TimeInterval = 10.0 // 10 second timeout
-                let startTime = Date()
+                let processCompleted = NSLock()
+                var isCompleted = false
                 
-                while process.isRunning {
-                    if Date().timeIntervalSince(startTime) > timeout {
+                // Set up timeout
+                DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
+                    processCompleted.lock()
+                    let completed = isCompleted
+                    processCompleted.unlock()
+                    
+                    if !completed && process.isRunning {
                         print("⏰ Shortcut execution timed out after \(timeout) seconds")
                         process.terminate()
-                        break
+                        let timeoutMsg = "⏰ Shortcut '\(shortcutName)' timed out and was terminated\n"
+                        self?.writeToDebugFile(timeoutMsg)
                     }
-                    usleep(100000) // Sleep for 0.1 seconds
                 }
                 
-                if process.isRunning {
-                    process.terminate()
-                    let timeoutMsg = "⏰ Shortcut '\(shortcutName)' timed out and was terminated\n"
-                    self?.writeToDebugFile(timeoutMsg)
-                    print("⏰ Shortcut '\(shortcutName)' timed out and was terminated")
-                } else {
-                    let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                    let output = String(data: data, encoding: .utf8) ?? ""
-                    
-                    let successMsg = "✅ Shortcut '\(shortcutName)' completed. Exit code: \(process.terminationStatus). Output: \(output)\n"
-                    self?.writeToDebugFile(successMsg)
-                    print("✅ Shortcut '\(shortcutName)' completed. Exit code: \(process.terminationStatus). Output: \(output)")
-                }
+                // Wait for process to complete
+                process.waitUntilExit()
+                
+                processCompleted.lock()
+                isCompleted = true
+                processCompleted.unlock()
+                
+                let data = pipe.fileHandleForReading.readDataToEndOfFile()
+                let output = String(data: data, encoding: .utf8) ?? ""
+                
+                let successMsg = "✅ Shortcut '\(shortcutName)' completed. Exit code: \(process.terminationStatus). Output: \(output)\n"
+                self?.writeToDebugFile(successMsg)
+                print("✅ Shortcut '\(shortcutName)' completed. Exit code: \(process.terminationStatus). Output: \(output)")
                 
                 // Clean up temp file
                 try? FileManager.default.removeItem(at: tempFile)
@@ -329,19 +538,29 @@ class SpaceMonitor {
         return detectedSpace
     }
     
-    private func writeToDebugFile(_ message: String) {
-        let fileURL = URL(fileURLWithPath: "/tmp/spaceagent_debug.log")
-        if let data = message.data(using: .utf8) {
-            if FileManager.default.fileExists(atPath: fileURL.path) {
-                if let fileHandle = try? FileHandle(forWritingTo: fileURL) {
-                    fileHandle.seekToEndOfFile()
-                    fileHandle.write(data)
-                    fileHandle.closeFile()
-                }
-            } else {
-                try? data.write(to: fileURL)
-            }
+    private func detectCurrentSpaceNumberWithTimeout() -> Int {
+        let timeout: TimeInterval = 2.0 // 2 second timeout
+        let semaphore = DispatchSemaphore(value: 0)
+        var result: Int = 0
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            result = self.detectCurrentSpaceNumber()
+            semaphore.signal()
         }
+        
+        let timeoutResult = semaphore.wait(timeout: .now() + timeout)
+        if timeoutResult == .timedOut {
+            writeToDebugFile("Space detection timed out after \(timeout) seconds\n")
+            print("⚠️ Space detection timed out, using current space: \(currentSpaceNumber)")
+            return currentSpaceNumber // Return current space as fallback
+        }
+        
+        return result
+    }
+    
+    private func writeToDebugFile(_ message: String) {
+        // Simplified debug logging to prevent hanging
+        print("DEBUG: \(message.trimmingCharacters(in: .whitespacesAndNewlines))")
     }
 
     func updateCurrentSpace() {
@@ -369,49 +588,6 @@ class SpaceMonitor {
 
         DispatchQueue.main.async {
             self.delegate?.spaceDidChange(to: spaceNumber, from: previousSpace)
-        }
-    }
-}
-
-protocol SpaceChangeNotifierProtocol {
-    func notifySpaceChange(to spaceNumber: Int, from previousSpace: Int) -> Bool
-}
-
-class FileBasedSpaceNotifier: SpaceChangeNotifierProtocol {
-    private let triggerFileURL: URL
-
-    init() {
-        // Create trigger file in user's home directory
-        let homeURL = FileManager.default.homeDirectoryForCurrentUser
-        self.triggerFileURL = homeURL.appendingPathComponent(".space-agent-trigger")
-
-        // Create the file if it doesn't exist
-        if !FileManager.default.fileExists(atPath: triggerFileURL.path) {
-            FileManager.default.createFile(atPath: triggerFileURL.path, contents: nil, attributes: nil)
-        }
-    }
-
-    func notifySpaceChange(to spaceNumber: Int, from previousSpace: Int) -> Bool {
-        let timestamp = Date()
-        let formatter = DateFormatter()
-        formatter.dateFormat = "yyyy-MM-dd HH:mm:ss"
-
-        let spaceChangeInfo = """
-        {
-            "timestamp": "\(formatter.string(from: timestamp))",
-            "currentSpace": \(spaceNumber),
-            "previousSpace": \(previousSpace),
-            "unixTimestamp": \(timestamp.timeIntervalSince1970)
-        }
-        """
-
-        do {
-            try spaceChangeInfo.write(to: triggerFileURL, atomically: true, encoding: .utf8)
-            print("Space change written to trigger file: \(previousSpace) -> \(spaceNumber)")
-            return true
-        } catch {
-            print("Failed to write space change to trigger file: \(error)")
-            return false
         }
     }
 }
