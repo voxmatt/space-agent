@@ -3,12 +3,43 @@ import Cocoa
 
 // MARK: - Shared Utilities
 
+/// Log levels for filtering debug output
+enum LogLevel: Int, Comparable {
+    case debug = 0
+    case info = 1
+    case warning = 2
+    case error = 3
+
+    var prefix: String {
+        switch self {
+        case .debug: return "DEBUG"
+        case .info: return "INFO"
+        case .warning: return "WARN"
+        case .error: return "ERROR"
+        }
+    }
+
+    static func < (lhs: LogLevel, rhs: LogLevel) -> Bool {
+        return lhs.rawValue < rhs.rawValue
+    }
+}
+
+/// Current minimum log level - only logs at this level or higher will be written
+private let currentLogLevel: LogLevel = .info
+
 /// Writes a debug message to /tmp/spaceagent_debug.log asynchronously
-func writeToDebugLog(_ message: String) {
+func writeToDebugLog(_ message: String, level: LogLevel = .debug) {
+    // Filter based on log level
+    guard level >= currentLogLevel else { return }
+
     DispatchQueue.global(qos: .utility).async {
         let debugFilePath = "/tmp/spaceagent_debug.log"
-        let timestamp = DateFormatter().string(from: Date())
-        let logMessage = "[\(timestamp)] \(message.trimmingCharacters(in: .whitespacesAndNewlines))\n"
+
+        // Use faster ISO8601DateFormatter instead of creating new DateFormatter each time
+        let iso8601 = ISO8601DateFormatter()
+        let timestamp = iso8601.string(from: Date())
+
+        let logMessage = "[\(timestamp)] [\(level.prefix)] \(message.trimmingCharacters(in: .whitespacesAndNewlines))\n"
 
         guard let data = logMessage.data(using: .utf8) else { return }
 
@@ -52,7 +83,7 @@ class RealCoreGraphicsService: CoreGraphicsServiceProtocol {
     private var currentSpaceIDFromDefaults: UInt32?
 
     init() {
-        writeToDebugLog("Initializing RealCoreGraphicsService")
+        writeToDebugLog("Initializing RealCoreGraphicsService", level: .info)
 
         // Build space mapping from UserDefaults at initialization
         buildInitialSpaceMapping()
@@ -68,11 +99,11 @@ class RealCoreGraphicsService: CoreGraphicsServiceProtocol {
     
     /// Builds space mapping from UserDefaults at initialization
     private func buildInitialSpaceMapping() {
-        writeToDebugLog("Building space mapping from UserDefaults")
+        writeToDebugLog("Building space mapping from UserDefaults", level: .info)
 
         // Access the com.apple.spaces persistent domain
         guard let spacesConfig = UserDefaults.standard.persistentDomain(forName: "com.apple.spaces") else {
-            writeToDebugLog("Could not access com.apple.spaces persistent domain")
+            writeToDebugLog("Could not access com.apple.spaces persistent domain", level: .warning)
             return
         }
 
@@ -80,7 +111,7 @@ class RealCoreGraphicsService: CoreGraphicsServiceProtocol {
         guard let displayConfig = spacesConfig["SpacesDisplayConfiguration"] as? [String: Any],
               let managementData = displayConfig["Management Data"] as? [String: Any],
               let monitors = managementData["Monitors"] as? [[String: Any]] else {
-            writeToDebugLog("Could not parse space configuration structure")
+            writeToDebugLog("Could not parse space configuration structure", level: .warning)
             return
         }
 
@@ -121,7 +152,7 @@ class RealCoreGraphicsService: CoreGraphicsServiceProtocol {
 
         // Build mapping from sorted unique space IDs
         guard !allSpaceIDs.isEmpty else {
-            writeToDebugLog("No spaces found in Main monitor")
+            writeToDebugLog("No spaces found in Main monitor", level: .warning)
             return
         }
 
@@ -130,7 +161,7 @@ class RealCoreGraphicsService: CoreGraphicsServiceProtocol {
             spaceIDToNumberMap[spaceID] = index + 1
         }
 
-        writeToDebugLog("Built space mapping: \(spaceIDToNumberMap)")
+        writeToDebugLog("Built space mapping: \(spaceIDToNumberMap)", level: .info)
     }
     
     func detectActualSpace() -> Int {
@@ -144,20 +175,12 @@ class RealCoreGraphicsService: CoreGraphicsServiceProtocol {
 
         // If we don't have a mapping for this space ID, add it dynamically
         if spaceIDToNumberMap[spaceID] == nil {
-            let discoverMsg = "New space discovered: Space ID \(spaceID)\n"
-            writeToDebugLog(discoverMsg)
+            // Add new space with next available number (O(1) operation)
+            let newSpaceNumber = (spaceIDToNumberMap.values.max() ?? 0) + 1
+            spaceIDToNumberMap[spaceID] = newSpaceNumber
 
-            // Rebuild mapping with the new space included
-            let allSpaceIDs = Array(spaceIDToNumberMap.keys) + [spaceID]
-            let sortedSpaceIDs = Array(Set(allSpaceIDs)).sorted()
-
-            spaceIDToNumberMap.removeAll()
-            for (index, id) in sortedSpaceIDs.enumerated() {
-                spaceIDToNumberMap[id] = index + 1
-            }
-
-            let rebuildMsg = "Rebuilt space mapping: \(spaceIDToNumberMap)\n"
-            writeToDebugLog(rebuildMsg)
+            let discoverMsg = "New space discovered: Space ID \(spaceID) assigned Space #\(newSpaceNumber)\n"
+            writeToDebugLog(discoverMsg, level: .info)
         }
 
         // Use the mapping to get the space number
@@ -254,6 +277,7 @@ class SpaceMonitor {
             
             if spaceAgentLines.count > 1 {
                 let warningMsg = "⚠️  WARNING: Multiple SpaceAgent instances detected (\(spaceAgentLines.count)). This may cause conflicts.\n"
+                writeToDebugLog(warningMsg, level: .warning)
                 #if DEBUG
                 print(warningMsg)
                 #endif
@@ -290,16 +314,16 @@ class SpaceMonitor {
     }
 
     private func startPolling() {
-        // Use much longer interval (5 seconds) to avoid blocking CGS calls
-        // This is just a safety net - we rely primarily on app activation events
-        pollingTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+        // Use long interval (15 seconds) since this is just a safety net
+        // We rely primarily on app activation events and NSWorkspace notifications
+        pollingTimer = Timer.scheduledTimer(withTimeInterval: 15.0, repeats: true) { [weak self] _ in
             // Only poll if we're not already checking
             DispatchQueue.global(qos: .utility).async { [weak self] in
                 self?.pollForSpaceChange()
             }
         }
         #if DEBUG
-        print("SpaceMonitor: Polling started with 5s interval (safety net)")
+        print("SpaceMonitor: Polling started with 15s interval (safety net)")
         #endif
     }
 
@@ -341,7 +365,7 @@ class SpaceMonitor {
                 self.currentSpaceNumber = detectedSpace
 
                 let debugMsg = "Polling detected space change: \(previousSpace) -> \(detectedSpace)\n"
-                writeToDebugLog(debugMsg)
+                writeToDebugLog(debugMsg, level: .info)
                 #if DEBUG
                 print("Polling: Space change detected: \(previousSpace) -> \(detectedSpace)")
                 #endif
@@ -357,17 +381,17 @@ class SpaceMonitor {
     }
 
     @objc private func handleSpaceChange() {
-        writeToDebugLog("NSWorkspace space change notification received!")
+        writeToDebugLog("NSWorkspace space change notification received!", level: .info)
 
         // Detect the actual current space using Core Graphics Services with timeout protection
         let detectedSpace = detectCurrentSpaceNumberWithTimeout()
-        
+
         // Only update if we detected a valid space and it's different from current
         if detectedSpace > 0 && detectedSpace != currentSpaceNumber {
             let previousSpace = currentSpaceNumber
             currentSpaceNumber = detectedSpace
 
-            writeToDebugLog("Space change detected: \(previousSpace) -> \(currentSpaceNumber)")
+            writeToDebugLog("Space change detected: \(previousSpace) -> \(currentSpaceNumber)", level: .info)
             #if DEBUG
             print("Space change detected: \(previousSpace) -> \(currentSpaceNumber)")
             #endif
@@ -382,97 +406,6 @@ class SpaceMonitor {
             writeToDebugLog("Space change notification received but no actual change detected (detected: \(detectedSpace), current: \(currentSpaceNumber))")
         }
     }
-    
-    /// Triggers a shortcut using the command line tool when space changes
-    private func triggerShortcut(for spaceNumber: Int, from previousSpace: Int) {
-        // You can configure which shortcut to run here
-        // For now, we'll use a placeholder - you can change this to any shortcut name
-        let shortcutName = "Change default browser when space changes" // Change this to your desired shortcut name
-        
-        // Run shortcut execution asynchronously to prevent hanging
-        DispatchQueue.global(qos: .background).async { [weak self] in
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/shortcuts")
-            
-            // Pass the space number as simple text input
-            let spaceNumberText = String(spaceNumber)
-            
-            do {
-                // Create a temporary file with just the space number
-                let tempFile = FileManager.default.temporaryDirectory.appendingPathComponent("space_number.txt")
-                try spaceNumberText.write(to: tempFile, atomically: true, encoding: .utf8)
-                
-                let debugMsg = "📤 Sending space number to shortcut: \(spaceNumberText)\n"
-                writeToDebugLog(debugMsg)
-                #if DEBUG
-                print("📤 Sending space number to shortcut: \(spaceNumberText)")
-                #endif
-
-                process.arguments = ["run", shortcutName, "--input-path", tempFile.path]
-
-                let pipe = Pipe()
-                process.standardOutput = pipe
-                process.standardError = pipe
-
-                let startMsg = "🚀 Starting shortcut execution: \(shortcutName)\n"
-                writeToDebugLog(startMsg)
-                #if DEBUG
-                print("🚀 Starting shortcut execution: \(shortcutName)")
-                #endif
-                
-                try process.run()
-                
-                // Set a timeout to prevent hanging
-                let timeout: TimeInterval = 10.0 // 10 second timeout
-                let processCompleted = NSLock()
-                var isCompleted = false
-                
-                // Set up timeout
-                DispatchQueue.global().asyncAfter(deadline: .now() + timeout) {
-                    processCompleted.lock()
-                    let completed = isCompleted
-                    processCompleted.unlock()
-
-                    if !completed && process.isRunning {
-                        #if DEBUG
-                        print("⏰ Shortcut execution timed out after \(timeout) seconds")
-                        #endif
-                        process.terminate()
-                        let timeoutMsg = "⏰ Shortcut '\(shortcutName)' timed out and was terminated\n"
-                        writeToDebugLog(timeoutMsg)
-                    }
-                }
-                
-                // Wait for process to complete
-                process.waitUntilExit()
-                
-                processCompleted.lock()
-                isCompleted = true
-                processCompleted.unlock()
-                
-                let data = pipe.fileHandleForReading.readDataToEndOfFile()
-                let output = String(data: data, encoding: .utf8) ?? ""
-
-                let successMsg = "✅ Shortcut '\(shortcutName)' completed. Exit code: \(process.terminationStatus). Output: \(output)\n"
-                writeToDebugLog(successMsg)
-                #if DEBUG
-                print("✅ Shortcut '\(shortcutName)' completed. Exit code: \(process.terminationStatus). Output: \(output)")
-                #endif
-
-                // Clean up temp file
-                try? FileManager.default.removeItem(at: tempFile)
-
-            } catch {
-                let errorMsg = "❌ Failed to execute shortcut '\(shortcutName)': \(error)\n"
-                writeToDebugLog(errorMsg)
-                #if DEBUG
-                print("❌ Shortcut execution failed: \(error)")
-                #endif
-            }
-        }
-    }
-    
-    
 
     private func detectCurrentSpaceNumber() -> Int {
         let logMessage = "🔍 Detecting current space using Core Graphics Services...\n"
@@ -499,7 +432,7 @@ class SpaceMonitor {
         
         let timeoutResult = semaphore.wait(timeout: .now() + timeout)
         if timeoutResult == .timedOut {
-            writeToDebugLog("Space detection timed out after \(timeout) seconds\n")
+            writeToDebugLog("Space detection timed out after \(timeout) seconds", level: .warning)
             #if DEBUG
             print("⚠️ Space detection timed out, using current space: \(currentSpaceNumber)")
             #endif
