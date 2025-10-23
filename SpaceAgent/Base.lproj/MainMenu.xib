@@ -21,6 +21,12 @@
             <items>
                 <menuItem title="Space Agent v1.0" id="1Xt-HY-uBw"/>
                 <menuItem isSeparatorItem="YES" id="VOq-y0-SEH"/>
+                <menuItem title="Settings..." keyEquivalent="," id="3Nw-aK-SGj">
+                    <connections>
+                        <action selector="settingsClicked:" target="Voe-Tx-rLC" id="Xyz-Ab-123"/>
+                    </connections>
+                </menuItem>
+                <menuItem isSeparatorItem="YES" id="VOq-y1-SEH"/>
                 <menuItem title="Quit Space Agent" keyEquivalent="q" id="4sb-4s-VLi">
                     <connections>
                         <action selector="quitClicked:" target="Voe-Tx-rLC" id="Te7-pn-YzF"/>

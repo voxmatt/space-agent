@@ -1,0 +1,64 @@
+{
+  "fill" : {
+    "automatic-gradient" : "display-p3:0.07067,0.11179,0.80902,1.00000"
+  },
+  "groups" : [
+    {
+      "blend-mode" : "lighten",
+      "blur-material" : 0.5,
+      "hidden" : false,
+      "layers" : [
+        {
+          "image-name" : "spaceman.png",
+          "name" : "spaceman",
+          "position" : {
+            "scale" : 0.53,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "lighting" : "individual",
+      "name" : "Group",
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "specular" : false,
+      "translucency" : {
+        "enabled" : false,
+        "value" : 0.5
+      }
+    },
+    {
+      "layers" : [
+        {
+          "image-name" : "112CF7AA-0C14-44A4-879B-4D657B6FF890.png",
+          "name" : "112CF7AA-0C14-44A4-879B-4D657B6FF890",
+          "position" : {
+            "scale" : 1.3000000000000003,
+            "translation-in-points" : [
+              0,
+              0
+            ]
+          }
+        }
+      ],
+      "shadow" : {
+        "kind" : "neutral",
+        "opacity" : 0.5
+      },
+      "translucency" : {
+        "enabled" : true,
+        "value" : 0.5
+      }
+    }
+  ],
+  "supported-platforms" : {
+    "squares" : [
+      "macOS"
+    ]
+  }
+}

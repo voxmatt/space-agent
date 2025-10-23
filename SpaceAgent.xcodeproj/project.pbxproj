@@ -7,8 +7,10 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		5E8926712EAAE9280039B280 /* Space Agent Icon.icon in Resources */ = {isa = PBXBuildFile; fileRef = 5E8926702EAAE9280039B280 /* Space Agent Icon.icon */; };
 		AA1000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000 /* AppDelegate.swift */; };
 		AA1000000002 /* SpaceMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000020 /* SpaceMonitor.swift */; };
+		AA1000000003 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000030 /* SettingsWindowController.swift */; };
 		AA1000000005 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA1000000010 /* Assets.xcassets */; };
 		AA1000000006 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = AA1000000011 /* MainMenu.xib */; };
 		AA2000000001 /* SpaceAgentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000 /* SpaceAgentTests.swift */; };
@@ -27,11 +29,13 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		5E8926702EAAE9280039B280 /* Space Agent Icon.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; path = "Space Agent Icon.icon"; sourceTree = "<group>"; };
 		AA1000000000 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		AA1000000010 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		AA1000000011 /* MainMenu.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = MainMenu.xib; path = Base.lproj/MainMenu.xib; sourceTree = "<group>"; };
 		AA1000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AA1000000020 /* SpaceMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceMonitor.swift; sourceTree = "<group>"; };
+		AA1000000030 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
 		AA1000000101 /* SpaceAgent.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SpaceAgent.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA2000000000 /* SpaceAgentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceAgentTests.swift; sourceTree = "<group>"; };
 		AA2000000010 /* SpaceMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceMonitorTests.swift; sourceTree = "<group>"; };
@@ -63,6 +67,7 @@
 				AA1000000300 /* SpaceAgent */,
 				AA2000000300 /* SpaceAgentTests */,
 				AA0000000100 /* Products */,
+				5E8926702EAAE9280039B280 /* Space Agent Icon.icon */,
 			);
 			sourceTree = "<group>";
 		};
@@ -80,6 +85,7 @@
 			children = (
 				AA1000000000 /* AppDelegate.swift */,
 				AA1000000020 /* SpaceMonitor.swift */,
+				AA1000000030 /* SettingsWindowController.swift */,
 				AA1000000010 /* Assets.xcassets */,
 				AA1000000011 /* MainMenu.xib */,
 				AA1000000012 /* Info.plist */,
@@ -143,7 +149,7 @@
 			attributes = {
 				LastSwiftUpdateCheck = 1200;
 				LastUpgradeCheck = 1200;
-				ORGANIZATIONNAME = "MTM";
+				ORGANIZATIONNAME = MTM;
 				TargetAttributes = {
 					AA1000000100 = {
 						CreatedOnToolsVersion = 12.0;
@@ -179,6 +185,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				AA1000000005 /* Assets.xcassets in Resources */,
+				5E8926712EAAE9280039B280 /* Space Agent Icon.icon in Resources */,
 				AA1000000006 /* MainMenu.xib in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
@@ -199,6 +206,7 @@
 			files = (
 				AA1000000001 /* AppDelegate.swift in Sources */,
 				AA1000000002 /* SpaceMonitor.swift in Sources */,
+				AA1000000003 /* SettingsWindowController.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -349,7 +357,10 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				OTHER_LDFLAGS = "-framework CoreGraphics";
+				OTHER_LDFLAGS = (
+					"-framework",
+					CoreGraphics,
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.mtm.spaceagent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;
@@ -367,7 +378,10 @@
 					"$(inherited)",
 					"@executable_path/../Frameworks",
 				);
-				OTHER_LDFLAGS = "-framework CoreGraphics";
+				OTHER_LDFLAGS = (
+					"-framework",
+					CoreGraphics,
+				);
 				PRODUCT_BUNDLE_IDENTIFIER = com.mtm.spaceagent;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SWIFT_VERSION = 5.0;

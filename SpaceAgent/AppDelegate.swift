@@ -9,12 +9,14 @@ class AppDelegate: NSObject, NSApplicationDelegate, SpaceMonitorDelegate {
     private let statusBarItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
     private var spaceMonitor: SpaceMonitor!
     private var isTerminating = false
+    private var settingsWindowController: SettingsWindowController?
 
     func applicationDidFinishLaunching(_ aNotification: Notification) {
         setupApplication()
         setupStatusItem()
         setupSpaceMonitoring()
         setupSignalHandling()
+        setupSettingsObserver()
     }
 
     private func setupApplication() {
@@ -22,7 +24,8 @@ class AppDelegate: NSObject, NSApplicationDelegate, SpaceMonitorDelegate {
     }
 
     private func setupStatusItem() {
-        statusBarItem.button?.title = "🚀"
+        let icon = SettingsWindowController.getMenuBarIcon()
+        statusBarItem.button?.title = icon
         statusBarItem.menu = statusMenu
         updateStatusBarTitle(with: 0)
     }
@@ -61,18 +64,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, SpaceMonitorDelegate {
 
     func updateStatusBarTitle(with spaceNumber: Int) {
         DispatchQueue.main.async {
+            let icon = SettingsWindowController.getMenuBarIcon()
             #if DEBUG
             print("Updating menubar title to: \(spaceNumber)")
             #endif
             if spaceNumber > 0 {
-                self.statusBarItem.button?.title = "🚀 \(spaceNumber)"
+                self.statusBarItem.button?.title = "\(icon) \(spaceNumber)"
                 #if DEBUG
-                print("Set menubar title to: 🚀 \(spaceNumber)")
+                print("Set menubar title to: \(icon) \(spaceNumber)")
                 #endif
             } else {
-                self.statusBarItem.button?.title = "🚀 ?"
+                self.statusBarItem.button?.title = "\(icon) ?"
                 #if DEBUG
-                print("Set menubar title to: 🚀 ?")
+                print("Set menubar title to: \(icon) ?")
                 #endif
             }
         }
@@ -85,12 +89,37 @@ class AppDelegate: NSObject, NSApplicationDelegate, SpaceMonitorDelegate {
                 NSApplication.shared.terminate(nil)
             }
         }
-        
+
         signal(SIGINT) { _ in
             DispatchQueue.main.async {
                 NSApplication.shared.terminate(nil)
             }
         }
+    }
+
+    private func setupSettingsObserver() {
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(settingsChanged(_:)),
+            name: NSNotification.Name("SettingsChanged"),
+            object: nil
+        )
+    }
+
+    @objc private func settingsChanged(_ notification: Notification) {
+        // Update the menu bar icon when settings change
+        if let currentSpace = spaceMonitor?.getCurrentSpaceNumber() {
+            updateStatusBarTitle(with: currentSpace)
+        }
+    }
+
+    @IBAction func settingsClicked(_ sender: NSMenuItem) {
+        if settingsWindowController == nil {
+            settingsWindowController = SettingsWindowController()
+        }
+
+        settingsWindowController?.showWindow(self)
+        NSApp.activate(ignoringOtherApps: true)
     }
 
     @IBAction func quitClicked(_ sender: NSMenuItem) {

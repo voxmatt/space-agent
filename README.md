@@ -7,7 +7,10 @@ A background macOS agent that monitors virtual space changes and displays the cu
 - 🚀 Monitors macOS virtual space (desktop) changes
 - 🔄 Runs automatically in the background
 - 📊 Shows current space number in menu bar
+- ⚙️ Simple settings window for customization
+- 🎨 Customizable menu bar icon
 - 🏁 Auto-starts on login
+- 📝 Configurable logging levels
 
 ## Installation
 
@@ -28,6 +31,18 @@ The installation script will:
 ## Setup
 
 After installation, SpaceAgent will automatically start monitoring your spaces and display the current space number in the menu bar.
+
+## Settings
+
+Click the menu bar icon and select "Settings..." to customize:
+
+- **Menu Bar Icon**: Change the emoji or text shown in the menu bar (default: 🚀)
+- **Polling Interval**: Adjust how often the app checks for space changes (5-60 seconds, default: 15)
+- **Log Level**: Set minimum logging level for debug logs (Debug, Info, Warning, Error)
+
+Additional features in the Settings window:
+- **View Logs**: Open the debug log file in Console.app
+- **Reset to Defaults**: Restore all settings to their default values
 
 ## How It Works
 
