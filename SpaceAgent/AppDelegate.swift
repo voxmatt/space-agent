@@ -31,12 +31,16 @@ class AppDelegate: NSObject, NSApplicationDelegate, SpaceMonitorDelegate {
         // Update menubar immediately with a default value
         updateStatusBarTitle(with: 1)
 
+        #if DEBUG
         print("AppDelegate: Will initialize SpaceMonitor in 0.5 seconds")
+        #endif
 
         // Initialize space monitoring after a delay to prevent hanging
         // Do the initialization on a background thread to avoid blocking
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
+            #if DEBUG
             print("AppDelegate: Creating SpaceMonitor on background thread")
+            #endif
             DispatchQueue.global(qos: .userInitiated).async {
                 let monitor = SpaceMonitor()
 
@@ -47,7 +51,9 @@ class AppDelegate: NSObject, NSApplicationDelegate, SpaceMonitorDelegate {
                     // Update menu bar with the actual detected space
                     let currentSpace = self.spaceMonitor.getCurrentSpaceNumber()
                     self.updateStatusBarTitle(with: currentSpace)
+                    #if DEBUG
                     print("AppDelegate: Initial space from monitor: \(currentSpace)")
+                    #endif
                 }
             }
         }
@@ -55,13 +61,19 @@ class AppDelegate: NSObject, NSApplicationDelegate, SpaceMonitorDelegate {
 
     func updateStatusBarTitle(with spaceNumber: Int) {
         DispatchQueue.main.async {
+            #if DEBUG
             print("Updating menubar title to: \(spaceNumber)")
+            #endif
             if spaceNumber > 0 {
                 self.statusBarItem.button?.title = "🚀 \(spaceNumber)"
+                #if DEBUG
                 print("Set menubar title to: 🚀 \(spaceNumber)")
+                #endif
             } else {
                 self.statusBarItem.button?.title = "🚀 ?"
+                #if DEBUG
                 print("Set menubar title to: 🚀 ?")
+                #endif
             }
         }
     }
@@ -88,24 +100,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, SpaceMonitorDelegate {
     private func gracefulTermination() {
         guard !isTerminating else { return }
         isTerminating = true
-        
+
+        #if DEBUG
         print("SpaceAgent: Initiating graceful termination...")
-        
+        #endif
+
         // Clean up space monitor
         spaceMonitor = nil
-        
+
         // Terminate the application
         NSApplication.shared.terminate(self)
     }
 
     func applicationWillTerminate(_ aNotification: Notification) {
+        #if DEBUG
         print("SpaceAgent: Application will terminate")
+        #endif
         isTerminating = true
         spaceMonitor = nil
     }
 
     func spaceDidChange(to spaceNumber: Int, from previousSpace: Int) {
         updateStatusBarTitle(with: spaceNumber)
+        #if DEBUG
         print("Space changed from \(previousSpace) to \(spaceNumber)")
+        #endif
     }
 }
