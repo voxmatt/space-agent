@@ -29,16 +29,30 @@ protocol CoreGraphicsServiceProtocol {
 
 class RealCoreGraphicsService: CoreGraphicsServiceProtocol {
     private var spaceIDToNumberMap: [UInt32: Int] = [:]
-    
+    private var currentSpaceIDFromDefaults: UInt32?
+
     init() {
         let debugMsg = "Initializing RealCoreGraphicsService with real Core Graphics Services\n"
         writeToDebugFile(debugMsg)
-        
+        print("DEBUG: Initializing RealCoreGraphicsService")
+
         // Try to get all spaces at initialization using public APIs
+        // This will also set currentSpaceIDFromDefaults
         if !buildInitialSpaceMapping() {
+            print("DEBUG: buildInitialSpaceMapping failed, falling back to buildCompleteSpaceMapping")
             // Fallback to dynamic discovery if initial mapping fails
             buildCompleteSpaceMapping()
+        } else {
+            print("DEBUG: buildInitialSpaceMapping succeeded")
         }
+    }
+
+    func getCurrentSpaceFromDefaults() -> Int? {
+        // Return the current space number based on UserDefaults, without calling CGS
+        if let spaceID = currentSpaceIDFromDefaults, let spaceNumber = spaceIDToNumberMap[spaceID] {
+            return spaceNumber
+        }
+        return nil
     }
     
     /// Attempts to build space mapping using public APIs at initialization
@@ -48,188 +62,201 @@ class RealCoreGraphicsService: CoreGraphicsServiceProtocol {
         writeToDebugFile(msg)
         
         // Method 1: Try to get spaces from NSUserDefaults
-        if let spacesConfig = UserDefaults.standard.object(forKey: "com.apple.spaces") as? [String: Any] {
+        // com.apple.spaces is a persistent domain, not a suite
+        let spacesInfoMsg = "=== com.apple.spaces Information ===\n"
+        writeToDebugFile(spacesInfoMsg)
+
+        // Access the persistent domain "com.apple.spaces"
+        let spacesInfo = UserDefaults.standard.persistentDomain(forName: "com.apple.spaces")
+
+        if let spacesInfo = spacesInfo, !spacesInfo.isEmpty {
+            let dataTypeMsg = "com.apple.spaces data type: \(type(of: spacesInfo))\n"
+            writeToDebugFile(dataTypeMsg)
+            
+            let rawDataMsg = "com.apple.spaces raw data: \(spacesInfo)\n"
+            writeToDebugFile(rawDataMsg)
+            
+            // Try to extract more detailed information
+            if let spacesDict = spacesInfo as? [String: Any] {
+                let keysMsg = "com.apple.spaces dictionary keys: \(Array(spacesDict.keys))\n"
+                writeToDebugFile(keysMsg)
+                for (key, value) in spacesDict {
+                    let keyValueMsg = "  \(key): \(value) (type: \(type(of: value)))\n"
+                    writeToDebugFile(keyValueMsg)
+                }
+            } else if let spacesArray = spacesInfo as? [Any] {
+                let arrayMsg = "com.apple.spaces array with \(spacesArray.count) items:\n"
+                writeToDebugFile(arrayMsg)
+                for (index, item) in spacesArray.enumerated() {
+                    let itemMsg = "  [\(index)]: \(item) (type: \(type(of: item)))\n"
+                    writeToDebugFile(itemMsg)
+                }
+            }
+        } else {
+            let notFoundMsg = "com.apple.spaces data not found in UserDefaults\n"
+            writeToDebugFile(notFoundMsg)
+        }
+        
+        let endSpacesInfoMsg = "=== End com.apple.spaces Information ===\n"
+        writeToDebugFile(endSpacesInfoMsg)
+
+        // Try again to get the spaces configuration from persistent domain
+        if let spacesConfig = UserDefaults.standard.persistentDomain(forName: "com.apple.spaces") {
             let configMsg = "Found spaces configuration in NSUserDefaults\n"
             writeToDebugFile(configMsg)
-            
+
             // Print the complete structure for debugging
             let fullStructureMsg = "=== COMPLETE com.apple.spaces STRUCTURE ===\n"
             writeToDebugFile(fullStructureMsg)
-            
+
             // Print top-level keys
             let topLevelKeysMsg = "Top-level keys: \(Array(spacesConfig.keys))\n"
             writeToDebugFile(topLevelKeysMsg)
-            
+
             // Print the entire structure recursively
             let structureDump = dumpStructure(spacesConfig, indent: 0)
             writeToDebugFile(structureDump)
-            
+
             let endStructureMsg = "=== END com.apple.spaces STRUCTURE ===\n"
             writeToDebugFile(endStructureMsg)
-            
+
             let debugConfigMsg = "Spaces config keys: \(Array(spacesConfig.keys))\n"
             writeToDebugFile(debugConfigMsg)
-            
-            // Parse the spaces configuration - the structure is:
-            // SpacesDisplayConfiguration.Monitors[0].Spaces
+
+            // Parse the spaces configuration - the correct structure is:
+            // SpacesDisplayConfiguration -> "Management Data" -> Monitors[0].Spaces (for main monitor)
             if let displayConfig = spacesConfig["SpacesDisplayConfiguration"] as? [String: Any] {
                 let displayConfigMsg = "Found SpacesDisplayConfiguration\n"
                 writeToDebugFile(displayConfigMsg)
-                
-                if let monitors = displayConfig["Monitors"] as? [[String: Any]] {
-                    let monitorsMsg = "Found \(monitors.count) monitors\n"
-                    writeToDebugFile(monitorsMsg)
-                    
-                    if let mainMonitor = monitors.first {
-                        let mainMonitorMsg = "Main monitor keys: \(Array(mainMonitor.keys))\n"
-                        writeToDebugFile(mainMonitorMsg)
-                        
-                        if let spaces = mainMonitor["Spaces"] as? [[String: Any]] {
-                            let spacesCountMsg = "Found \(spaces.count) spaces in configuration\n"
-                            writeToDebugFile(spacesCountMsg)
-                            
-                            var spaceIDs: [UInt32] = []
-                            
-                            for (index, space) in spaces.enumerated() {
-                                // Try to extract space ID from various possible keys
-                                var spaceID: UInt32? = nil
-                                
-                                if let managedSpaceID = space["ManagedSpaceID"] as? UInt32 {
-                                    spaceID = managedSpaceID
-                                } else if let id64 = space["id64"] as? UInt64 {
-                                    spaceID = UInt32(id64)
-                                } else if let uuid = space["uuid"] as? String, !uuid.isEmpty {
-                                    // Convert UUID to a numeric ID (simplified approach)
-                                    spaceID = UInt32(uuid.hashValue & 0xFFFFFFFF)
+
+                // Access the "Management Data" level
+                if let managementData = displayConfig["Management Data"] as? [String: Any] {
+                    let managementDataMsg = "Found Management Data\n"
+                    writeToDebugFile(managementDataMsg)
+
+                    if let monitors = managementData["Monitors"] as? [[String: Any]] {
+                        let monitorsMsg = "Found \(monitors.count) monitors\n"
+                        writeToDebugFile(monitorsMsg)
+
+                        // Look for the Main monitor only (ignore secondary monitors and collapsed spaces)
+                        var allSpaceIDs: [UInt32] = []
+
+                        for (monitorIndex, monitor) in monitors.enumerated() {
+                            let monitorKeysMsg = "Monitor \(monitorIndex) keys: \(Array(monitor.keys))\n"
+                            writeToDebugFile(monitorKeysMsg)
+
+                            // Check if this is the Main monitor
+                            let displayIdentifier = monitor["Display Identifier"] as? String
+                            let isMainMonitor = displayIdentifier == "Main"
+
+                            let displayMsg = "Monitor \(monitorIndex) Display Identifier: \(displayIdentifier ?? "nil"), isMain: \(isMainMonitor)\n"
+                            writeToDebugFile(displayMsg)
+
+                            // Only process Main monitor spaces, skip collapsed spaces from other monitors
+                            if isMainMonitor {
+                                // Extract current space ID
+                                if let currentSpace = monitor["Current Space"] as? [String: Any] {
+                                    if let currentSpaceID = currentSpace["ManagedSpaceID"] as? UInt32 {
+                                        currentSpaceIDFromDefaults = currentSpaceID
+                                        let currentMsg = "Current space ID from UserDefaults: \(currentSpaceID)\n"
+                                        writeToDebugFile(currentMsg)
+                                        print("DEBUG: Current space ID from UserDefaults: \(currentSpaceID)")
+                                    } else if let id64 = currentSpace["id64"] as? UInt64 {
+                                        currentSpaceIDFromDefaults = UInt32(id64)
+                                    } else if let id64Int = currentSpace["id64"] as? Int {
+                                        currentSpaceIDFromDefaults = UInt32(id64Int)
+                                    }
                                 }
-                                
-                                if let id = spaceID {
-                                    spaceIDs.append(id)
-                                    let spaceMsg = "Space \(index + 1): ManagedSpaceID \(id)\n"
-                                    writeToDebugFile(spaceMsg)
+
+                                if let spaces = monitor["Spaces"] as? [[String: Any]] {
+                                    let spacesCountMsg = "Found \(spaces.count) spaces in Main monitor\n"
+                                    writeToDebugFile(spacesCountMsg)
+
+                                    for (index, space) in spaces.enumerated() {
+                                        // Extract space ID - prefer ManagedSpaceID, fallback to id64
+                                        var spaceID: UInt32? = nil
+
+                                        if let managedSpaceID = space["ManagedSpaceID"] as? UInt32 {
+                                            spaceID = managedSpaceID
+                                        } else if let id64 = space["id64"] as? UInt64 {
+                                            spaceID = UInt32(id64)
+                                        } else if let id64Int = space["id64"] as? Int {
+                                            spaceID = UInt32(id64Int)
+                                        }
+
+                                        if let id = spaceID {
+                                            allSpaceIDs.append(id)
+                                            let spaceMsg = "Main monitor space \(index + 1): ManagedSpaceID \(id)\n"
+                                            writeToDebugFile(spaceMsg)
+                                        } else {
+                                            let noIDMsg = "Warning: Space at index \(index) has no parseable ID: \(space)\n"
+                                            writeToDebugFile(noIDMsg)
+                                        }
+                                    }
                                 }
                             }
-                            
-                            if !spaceIDs.isEmpty {
-                                // Sort space IDs and create mapping
-                                spaceIDs.sort()
-                                
-                                for (index, spaceID) in spaceIDs.enumerated() {
-                                    let spaceNumber = index + 1
-                                    spaceIDToNumberMap[spaceID] = spaceNumber
-                                    let mappingMsg = "Mapped Space ID \(spaceID) to Space Number \(spaceNumber)\n"
-                                    writeToDebugFile(mappingMsg)
-                                }
-                                
-                                let successMsg = "Successfully built initial space mapping: \(spaceIDToNumberMap)\n"
-                                writeToDebugFile(successMsg)
-                                return true
+                        }
+
+                        if !allSpaceIDs.isEmpty {
+                            // Remove duplicates and sort space IDs
+                            let uniqueSpaceIDs = Array(Set(allSpaceIDs)).sorted()
+                            let uniqueSpaceIDsMsg = "All unique space IDs found: \(uniqueSpaceIDs)\n"
+                            writeToDebugFile(uniqueSpaceIDsMsg)
+                            print("DEBUG: All unique space IDs found: \(uniqueSpaceIDs)")
+
+                            // Create mapping based on sorted order
+                            for (index, spaceID) in uniqueSpaceIDs.enumerated() {
+                                let spaceNumber = index + 1
+                                spaceIDToNumberMap[spaceID] = spaceNumber
+                                let mappingMsg = "Mapped Space ID \(spaceID) to Space Number \(spaceNumber)\n"
+                                writeToDebugFile(mappingMsg)
+                                print("DEBUG: Mapped Space ID \(spaceID) to Space Number \(spaceNumber)")
                             }
+
+                            let successMsg = "Successfully built initial space mapping: \(spaceIDToNumberMap)\n"
+                            writeToDebugFile(successMsg)
+                            print("DEBUG: Successfully built initial space mapping: \(spaceIDToNumberMap)")
+                            return true
                         } else {
-                            let noSpacesMsg = "No Spaces array found in main monitor\n"
+                            let noSpacesMsg = "No spaces found in Main monitor\n"
                             writeToDebugFile(noSpacesMsg)
+                            print("DEBUG: No spaces found in Main monitor")
                         }
                     } else {
-                        let noMainMonitorMsg = "No main monitor found\n"
-                        writeToDebugFile(noMainMonitorMsg)
+                        let noMonitorsMsg = "No Monitors array found in Management Data\n"
+                        writeToDebugFile(noMonitorsMsg)
                     }
                 } else {
-                    let noMonitorsMsg = "No Monitors array found\n"
-                    writeToDebugFile(noMonitorsMsg)
+                    let noManagementDataMsg = "No Management Data found in SpacesDisplayConfiguration\n"
+                    writeToDebugFile(noManagementDataMsg)
                 }
             } else {
                 let noDisplayConfigMsg = "No SpacesDisplayConfiguration found\n"
                 writeToDebugFile(noDisplayConfigMsg)
             }
         }
-        
-        // Method 2: Try window-based space detection
-        let windowSpaceIDs = detectSpacesUsingWindows()
-        if !windowSpaceIDs.isEmpty {
-            // Sort space IDs and create mapping
-            for (index, spaceID) in windowSpaceIDs.enumerated() {
-                let spaceNumber = index + 1
-                spaceIDToNumberMap[spaceID] = spaceNumber
-                let mappingMsg = "Window-based mapping: Space ID \(spaceID) -> Space Number \(spaceNumber)\n"
-                writeToDebugFile(mappingMsg)
-            }
-            
-            let successMsg = "Successfully built window-based space mapping: \(spaceIDToNumberMap)\n"
-            writeToDebugFile(successMsg)
-            return true
-        }
-        
-        // Method 3: Fallback to current space only
-        let connection = _CGSDefaultConnection()
-        let currentSpaceID = CGSGetActiveSpace(connection)
-        
-        let currentSpaceMsg = "Current space ID detected: \(currentSpaceID)\n"
-        writeToDebugFile(currentSpaceMsg)
-        
-        // At minimum, map the current space to 1
-        spaceIDToNumberMap[currentSpaceID] = 1
-        
-        let fallbackMsg = "Built minimal mapping with current space: \(spaceIDToNumberMap)\n"
+
+        // Don't call CGS here - it will freeze during init
+        // Instead, rely on the spaces we found in UserDefaults
+        // If we didn't find any spaces, we'll detect them lazily on first poll
+        let fallbackMsg = "No spaces found in UserDefaults, will detect on first poll\n"
         writeToDebugFile(fallbackMsg)
-        
-        return true // We have at least the current space mapped
+
+        return false // Will use dynamic discovery
     }
-    
-    /// Alternative method: Use window-based space detection
-    private func detectSpacesUsingWindows() -> [UInt32] {
-        let msg = "Attempting window-based space detection\n"
-        writeToDebugFile(msg)
-        
-        // Get all on-screen windows
-        guard let windowList = CGWindowListCopyWindowInfo(.optionOnScreenOnly, kCGNullWindowID) as? [[String: Any]] else {
-            let errorMsg = "Failed to get window list\n"
-            writeToDebugFile(errorMsg)
-            return []
-        }
-        
-        let windowCountMsg = "Found \(windowList.count) on-screen windows\n"
-        writeToDebugFile(windowCountMsg)
-        
-        // Extract space IDs from windows
-        var spaceIDs: Set<UInt32> = []
-        
-        for window in windowList {
-            if let spaceID = window["kCGWindowWorkspace"] as? UInt32 {
-                spaceIDs.insert(spaceID)
-                let windowMsg = "Window on space ID: \(spaceID)\n"
-                writeToDebugFile(windowMsg)
-            }
-        }
-        
-        let detectedSpacesMsg = "Detected spaces via windows: \(Array(spaceIDs).sorted())\n"
-        writeToDebugFile(detectedSpacesMsg)
-        
-        return Array(spaceIDs).sorted()
-    }
-    
+
     private func buildCompleteSpaceMapping() {
-        // Since we can't reliably get all spaces upfront, we'll use dynamic discovery
-        // This method will be called when we encounter an unknown space ID
-        let msg = "Dynamic space discovery: building mapping from discovered spaces\n"
+        // This method rebuilds the mapping when a new space is discovered
+        // It should NOT call any CGS functions
+        let msg = "Dynamic space discovery: rebuilding mapping from discovered spaces\n"
         writeToDebugFile(msg)
-        
-        // Get the current space ID to start with
-        let connection = _CGSDefaultConnection()
-        let currentSpaceID = CGSGetActiveSpace(connection)
-        
-        // If we have no spaces discovered yet, start with the current one
-        if spaceIDToNumberMap.isEmpty {
-            spaceIDToNumberMap[currentSpaceID] = 1
-            let msg = "Initial space discovered: Space ID \(currentSpaceID) -> Space Number 1\n"
-            writeToDebugFile(msg)
-        }
-        
+
         // Sort the discovered space IDs and rebuild the mapping
         let discoveredSpaceIDs = Array(spaceIDToNumberMap.keys).sorted()
-        
+
         let sortedSpaceIDsMsg = "Discovered space IDs: \(discoveredSpaceIDs)\n"
         writeToDebugFile(sortedSpaceIDsMsg)
-        
+
         // Rebuild mapping based on sorted order
         spaceIDToNumberMap.removeAll()
         for (index, spaceID) in discoveredSpaceIDs.enumerated() {
@@ -238,27 +265,29 @@ class RealCoreGraphicsService: CoreGraphicsServiceProtocol {
             let mappingMsg = "Mapped Space ID \(spaceID) to Space Number \(spaceNumber) (index \(index))\n"
             writeToDebugFile(mappingMsg)
         }
-        
+
         let completeMappingMsg = "Dynamic mapping built: \(spaceIDToNumberMap)\n"
         writeToDebugFile(completeMappingMsg)
     }
     
     func detectActualSpace() -> Int {
         // Use real Core Graphics Services to detect the current space
+        // This is a simple, non-blocking version
         let connection = _CGSDefaultConnection()
         let spaceID = CGSGetActiveSpace(connection)
 
         let debugMsg = "Real CGS Detection - Space ID: \(spaceID)\n"
         writeToDebugFile(debugMsg)
+        print("DEBUG: detectActualSpace - Space ID: \(spaceID)")
 
         // If we don't have a mapping for this space ID, add it to our discovered spaces
         if spaceIDToNumberMap[spaceID] == nil {
             let discoverMsg = "New space discovered: Space ID \(spaceID)\n"
             writeToDebugFile(discoverMsg)
-            
+
             // Add the new space to our discovered spaces
             spaceIDToNumberMap[spaceID] = 0 // Temporary placeholder
-            
+
             // Rebuild the complete mapping with all discovered spaces
             buildCompleteSpaceMapping()
         }
@@ -267,6 +296,8 @@ class RealCoreGraphicsService: CoreGraphicsServiceProtocol {
         if let spaceNumber = spaceIDToNumberMap[spaceID] {
             let resultMsg = "Found mapping: Space ID \(spaceID) -> Space Number \(spaceNumber)\n"
             writeToDebugFile(resultMsg)
+            print("DEBUG: Found mapping: Space ID \(spaceID) -> Space Number \(spaceNumber)")
+            print("DEBUG: FINAL RESULT: Returning space number \(spaceNumber)")
             return spaceNumber
         }
 
@@ -274,6 +305,9 @@ class RealCoreGraphicsService: CoreGraphicsServiceProtocol {
         let spaceNumber = Int(spaceID)
         let resultMsg = "Fallback: Using Space ID \(spaceID) as Space Number \(spaceNumber)\n"
         writeToDebugFile(resultMsg)
+        print("DEBUG: No mapping found for Space ID \(spaceID), current mapping: \(spaceIDToNumberMap)")
+        print("DEBUG: Fallback: Using Space ID \(spaceID) as Space Number \(spaceNumber)")
+        print("DEBUG: FINAL RESULT: Returning space number \(spaceNumber)")
         return spaceNumber
     }
     
@@ -295,8 +329,26 @@ class RealCoreGraphicsService: CoreGraphicsServiceProtocol {
     }
     
     private func writeToDebugFile(_ message: String) {
-        // Simplified debug logging to prevent hanging
-        print("DEBUG: \(message.trimmingCharacters(in: .whitespacesAndNewlines))")
+        // Asynchronously write to debug file to prevent blocking
+        DispatchQueue.global(qos: .utility).async {
+            let debugFilePath = "/tmp/spaceagent_debug.log"
+            let timestamp = DateFormatter().string(from: Date())
+            let logMessage = "[\(timestamp)] \(message.trimmingCharacters(in: .whitespacesAndNewlines))\n"
+            
+            if let data = logMessage.data(using: .utf8) {
+                if FileManager.default.fileExists(atPath: debugFilePath) {
+                    // Append to existing file
+                    if let fileHandle = FileHandle(forWritingAtPath: debugFilePath) {
+                    fileHandle.seekToEndOfFile()
+                    fileHandle.write(data)
+                    fileHandle.closeFile()
+                }
+            } else {
+                    // Create new file
+                    try? data.write(to: URL(fileURLWithPath: debugFilePath))
+                }
+            }
+        }
     }
     
     /// Helper function to recursively dump the structure of a dictionary/array for debugging
@@ -351,20 +403,46 @@ protocol SpaceMonitorDelegate: AnyObject {
 
 class SpaceMonitor {
     weak var delegate: SpaceMonitorDelegate?
-    
+
     private let coreGraphicsService: CoreGraphicsServiceProtocol
     private var currentSpaceNumber: Int = 1
+    private var pollingTimer: Timer?
+    private var isChecking = false // Prevent overlapping checks
+    private let checkQueue = DispatchQueue(label: "com.mtm.spaceagent.checkqueue", qos: .utility)
 
     init(coreGraphicsService: CoreGraphicsServiceProtocol = RealCoreGraphicsService()) {
         self.coreGraphicsService = coreGraphicsService
-        
-        // Check for multiple instances
-        checkForMultipleInstances()
-        
+
+        // Check for multiple instances in background to avoid blocking init
+        DispatchQueue.global(qos: .utility).async {
+            self.checkForMultipleInstances()
+        }
+
         setupMonitoring()
-        // Detect initial space
-        currentSpaceNumber = detectCurrentSpaceNumber()
-        print("SpaceMonitor: Initial space detected: \(currentSpaceNumber)")
+
+        // Get initial space from UserDefaults (no CGS call needed)
+        if let realCGS = coreGraphicsService as? RealCoreGraphicsService,
+           let initialSpace = realCGS.getCurrentSpaceFromDefaults() {
+            currentSpaceNumber = initialSpace
+            print("SpaceMonitor: Initial space from UserDefaults: \(initialSpace)")
+
+            // Notify delegate of initial space
+            DispatchQueue.main.async {
+                self.delegate?.spaceDidChange(to: initialSpace, from: 0)
+            }
+        } else {
+            // Fallback: start with space 1
+            currentSpaceNumber = 1
+            print("SpaceMonitor: Could not determine initial space, defaulting to 1")
+        }
+
+        print("SpaceMonitor: Init complete, will start polling in 3 seconds")
+
+        // Start polling for space changes as fallback (delayed to avoid immediate CGS call)
+        DispatchQueue.main.asyncAfter(deadline: .now() + 3.0) {
+            print("SpaceMonitor: Starting polling now")
+            self.startPolling()
+        }
     }
     
     private func checkForMultipleInstances() {
@@ -403,17 +481,80 @@ class SpaceMonitor {
     }
 
     private func setupMonitoring() {
-        // Listen for space change notifications
+        // Listen for space change notifications (may not work reliably)
         NSWorkspace.shared.notificationCenter.addObserver(
             self,
             selector: #selector(handleSpaceChange),
             name: NSWorkspace.activeSpaceDidChangeNotification,
             object: nil
         )
+
+        // Also listen for application activation which might indicate space change
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(handleAppActivation),
+            name: NSWorkspace.didActivateApplicationNotification,
+            object: nil
+        )
+    }
+
+    private func startPolling() {
+        // Use much longer interval (5 seconds) to avoid blocking CGS calls
+        // This is just a safety net - we rely primarily on app activation events
+        pollingTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            // Only poll if we're not already checking
+            DispatchQueue.global(qos: .utility).async { [weak self] in
+                self?.pollForSpaceChange()
+            }
+        }
+        print("SpaceMonitor: Polling started with 5s interval (safety net)")
+    }
+
+    @objc private func handleAppActivation() {
+        // When app activates, check if space changed
+        // Use utility queue to avoid blocking
+        DispatchQueue.global(qos: .utility).async { [weak self] in
+            self?.pollForSpaceChange()
+        }
     }
 
     private func stopMonitoring() {
         NSWorkspace.shared.notificationCenter.removeObserver(self)
+        pollingTimer?.invalidate()
+        pollingTimer = nil
+    }
+
+    private func pollForSpaceChange() {
+        // Prevent overlapping checks
+        checkQueue.async { [weak self] in
+            guard let self = self else { return }
+
+            // Skip if already checking
+            if self.isChecking {
+                print("SpaceMonitor: Already checking for space change, skipping...")
+                return
+            }
+
+            self.isChecking = true
+            defer { self.isChecking = false }
+
+            // Use timeout version to prevent hanging
+            let detectedSpace = self.detectCurrentSpaceNumberWithTimeout()
+
+            if detectedSpace > 0 && detectedSpace != self.currentSpaceNumber {
+                let previousSpace = self.currentSpaceNumber
+                self.currentSpaceNumber = detectedSpace
+
+                let debugMsg = "Polling detected space change: \(previousSpace) -> \(detectedSpace)\n"
+                self.writeToDebugFile(debugMsg)
+                print("Polling: Space change detected: \(previousSpace) -> \(detectedSpace)")
+
+                DispatchQueue.main.async {
+                    print("SpaceMonitor: Calling delegate with space \(self.currentSpaceNumber)")
+                    self.delegate?.spaceDidChange(to: self.currentSpaceNumber, from: previousSpace)
+                }
+            }
+        }
     }
 
     @objc private func handleSpaceChange() {
@@ -559,8 +700,26 @@ class SpaceMonitor {
     }
     
     private func writeToDebugFile(_ message: String) {
-        // Simplified debug logging to prevent hanging
-        print("DEBUG: \(message.trimmingCharacters(in: .whitespacesAndNewlines))")
+        // Asynchronously write to debug file to prevent blocking
+        DispatchQueue.global(qos: .utility).async {
+            let debugFilePath = "/tmp/spaceagent_debug.log"
+            let timestamp = DateFormatter().string(from: Date())
+            let logMessage = "[\(timestamp)] \(message.trimmingCharacters(in: .whitespacesAndNewlines))\n"
+            
+            if let data = logMessage.data(using: .utf8) {
+                if FileManager.default.fileExists(atPath: debugFilePath) {
+                    // Append to existing file
+                    if let fileHandle = FileHandle(forWritingAtPath: debugFilePath) {
+                    fileHandle.seekToEndOfFile()
+                    fileHandle.write(data)
+                    fileHandle.closeFile()
+                }
+            } else {
+                    // Create new file
+                    try? data.write(to: URL(fileURLWithPath: debugFilePath))
+                }
+            }
+        }
     }
 
     func updateCurrentSpace() {

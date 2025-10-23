@@ -30,15 +30,30 @@ class AppDelegate: NSObject, NSApplicationDelegate, SpaceMonitorDelegate {
     private func setupSpaceMonitoring() {
         // Update menubar immediately with a default value
         updateStatusBarTitle(with: 1)
-        
+
+        print("AppDelegate: Will initialize SpaceMonitor in 0.5 seconds")
+
         // Initialize space monitoring after a delay to prevent hanging
+        // Do the initialization on a background thread to avoid blocking
         DispatchQueue.main.asyncAfter(deadline: .now() + 0.5) {
-            self.spaceMonitor = SpaceMonitor()
-            self.spaceMonitor.delegate = self
+            print("AppDelegate: Creating SpaceMonitor on background thread")
+            DispatchQueue.global(qos: .userInitiated).async {
+                let monitor = SpaceMonitor()
+
+                DispatchQueue.main.async {
+                    self.spaceMonitor = monitor
+                    self.spaceMonitor.delegate = self
+
+                    // Update menu bar with the actual detected space
+                    let currentSpace = self.spaceMonitor.getCurrentSpaceNumber()
+                    self.updateStatusBarTitle(with: currentSpace)
+                    print("AppDelegate: Initial space from monitor: \(currentSpace)")
+                }
+            }
         }
     }
 
-    private func updateStatusBarTitle(with spaceNumber: Int) {
+    func updateStatusBarTitle(with spaceNumber: Int) {
         DispatchQueue.main.async {
             print("Updating menubar title to: \(spaceNumber)")
             if spaceNumber > 0 {
