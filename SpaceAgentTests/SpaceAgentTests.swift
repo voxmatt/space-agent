@@ -3,63 +3,78 @@ import XCTest
 
 class AppDelegateTests: XCTestCase {
     var appDelegate: AppDelegate!
-    var mockSpaceMonitor: MockSpaceMonitor!
 
     override func setUp() {
         super.setUp()
         appDelegate = AppDelegate()
-        mockSpaceMonitor = MockSpaceMonitor()
     }
 
     override func tearDown() {
         appDelegate = nil
-        mockSpaceMonitor = nil
         super.tearDown()
     }
 
     func testAppDelegateInitialization() {
-        XCTAssertNotNil(appDelegate)
+        XCTAssertNotNil(appDelegate, "AppDelegate should initialize")
     }
 
     func testApplicationDidFinishLaunching() {
         // Test that the app sets up correctly
         appDelegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))
-        
-        // Verify the method executes without crashing
-        XCTAssertTrue(true)
+
+        // Verify setup completed without crashing
+        XCTAssertTrue(true, "Application should finish launching without errors")
     }
 
     func testSpaceChangeHandling() {
         appDelegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))
-        
+
         // Test space change handling
         appDelegate.spaceDidChange(to: 3, from: 1)
-        
+
         // Verify the method executes without crashing
-        XCTAssertTrue(true)
+        XCTAssertTrue(true, "Should handle space change without errors")
     }
 
-    func testStatusBarTitleUpdate() {
+    func testMultipleSpaceChangeHandling() {
         appDelegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))
-        
-        // Test status bar title updates
+
+        // Test multiple space changes
         appDelegate.spaceDidChange(to: 2, from: 1)
         appDelegate.spaceDidChange(to: 4, from: 2)
         appDelegate.spaceDidChange(to: 1, from: 4)
-        
-        // Verify the methods execute without crashing
-        XCTAssertTrue(true)
-    }
+        appDelegate.spaceDidChange(to: 3, from: 1)
 
+        // Verify all changes are handled
+        XCTAssertTrue(true, "Should handle multiple space changes without errors")
+    }
 
     func testApplicationWillTerminate() {
         appDelegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))
-        
-        // Test cleanup
+
+        // Test cleanup on termination
         appDelegate.applicationWillTerminate(Notification(name: NSApplication.willTerminateNotification))
-        
-        // Verify the method executes without crashing
-        XCTAssertTrue(true)
+
+        // Verify cleanup completed without crashing
+        XCTAssertTrue(true, "Application should terminate cleanly")
+    }
+
+    func testSpaceChangeWithZeroPreviousSpace() {
+        // Test edge case with zero previous space (initial state)
+        appDelegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))
+
+        appDelegate.spaceDidChange(to: 1, from: 0)
+
+        XCTAssertTrue(true, "Should handle zero previous space")
+    }
+
+    func testSpaceChangeWithSameSpace() {
+        // Test edge case with same space (should not typically happen but should be handled)
+        appDelegate.applicationDidFinishLaunching(Notification(name: NSApplication.didFinishLaunchingNotification))
+
+        appDelegate.spaceDidChange(to: 2, from: 2)
+
+        XCTAssertTrue(true, "Should handle same space change gracefully")
     }
 }
 
@@ -77,133 +92,156 @@ class RealCoreGraphicsServiceTests: XCTestCase {
     }
 
     func testInitialization() {
-        XCTAssertNotNil(realCoreGraphicsService)
+        XCTAssertNotNil(realCoreGraphicsService, "RealCoreGraphicsService should initialize")
     }
 
-    func testDefaultConnection() {
-        let connection = realCoreGraphicsService.defaultConnection()
-        XCTAssertEqual(connection, 1) // Mock connection ID
-    }
+    func testGetCurrentSpaceFromDefaults() {
+        // Test that we can read from UserDefaults
+        let spaceFromDefaults = realCoreGraphicsService.getCurrentSpaceFromDefaults()
 
-    func testCopyManagedDisplaySpaces() {
-        let connection = realCoreGraphicsService.defaultConnection()
-        let spaces = realCoreGraphicsService.copyManagedDisplaySpaces(connection)
-        
-        // Should return empty array for dynamic discovery
-        XCTAssertEqual(CFArrayGetCount(spaces), 0)
-    }
-
-    func testCopyActiveMenuBarDisplayIdentifier() {
-        let connection = realCoreGraphicsService.defaultConnection()
-        let identifier = realCoreGraphicsService.copyActiveMenuBarDisplayIdentifier(connection)
-        
-        XCTAssertEqual(identifier as String, "Main")
+        // May be nil or a valid space number depending on system state
+        if let space = spaceFromDefaults {
+            XCTAssertGreaterThanOrEqual(space, 1, "Space from defaults should be >= 1")
+        } else {
+            XCTAssertNil(spaceFromDefaults, "Space from defaults may be nil")
+        }
     }
 
     func testDetectActualSpace() {
         // Test that detectActualSpace returns a valid space number
         let spaceNumber = realCoreGraphicsService.detectActualSpace()
-        XCTAssertGreaterThanOrEqual(spaceNumber, 1)
+
+        XCTAssertGreaterThanOrEqual(spaceNumber, 1, "Detected space should be >= 1")
+        XCTAssertLessThanOrEqual(spaceNumber, 100, "Detected space should be reasonable (<= 100)")
+    }
+
+    func testDetectActualSpaceConsistency() {
+        // Test that multiple calls return consistent results
+        let space1 = realCoreGraphicsService.detectActualSpace()
+        let space2 = realCoreGraphicsService.detectActualSpace()
+
+        // Should return the same space if no actual space change occurred
+        XCTAssertEqual(space1, space2, "Multiple detections should return consistent results")
+    }
+
+    func testDetectActualSpacePerformance() {
+        // Test performance of space detection
+        measure {
+            _ = realCoreGraphicsService.detectActualSpace()
+        }
     }
 }
 
 class SpaceMonitorIntegrationTests: XCTestCase {
-    var mockSpaceMonitor: MockSpaceMonitor!
+    var spaceMonitor: SpaceMonitor!
+    var mockCoreGraphicsService: MockCoreGraphicsService!
     var mockDelegate: MockSpaceMonitorDelegate!
 
     override func setUp() {
         super.setUp()
+        mockCoreGraphicsService = MockCoreGraphicsService()
         mockDelegate = MockSpaceMonitorDelegate()
-        mockSpaceMonitor = MockSpaceMonitor()
-        mockSpaceMonitor.delegate = mockDelegate
+        spaceMonitor = SpaceMonitor(coreGraphicsService: mockCoreGraphicsService)
+        spaceMonitor.delegate = mockDelegate
     }
 
     override func tearDown() {
-        mockSpaceMonitor = nil
+        spaceMonitor = nil
+        mockDelegate?.reset()
+        mockCoreGraphicsService?.reset()
         mockDelegate = nil
+        mockCoreGraphicsService = nil
         super.tearDown()
     }
 
     func testSpaceMonitorInitialization() {
-        XCTAssertNotNil(mockSpaceMonitor)
-        XCTAssertNotNil(mockSpaceMonitor.delegate)
-        XCTAssertEqual(mockSpaceMonitor.getCurrentSpaceNumber(), 1) // Mock returns 1
+        XCTAssertNotNil(spaceMonitor, "SpaceMonitor should initialize")
+        XCTAssertNotNil(spaceMonitor.delegate, "Delegate should be set")
+        XCTAssertEqual(spaceMonitor.getCurrentSpaceNumber(), 1, "Initial space should be 1 from mock")
     }
 
-    func testSpaceChangeDetection() {
-        // Test that space changes are detected and delegate is called
-        mockSpaceMonitor.updateCurrentSpace()
-        
-        // Verify delegate was called
-        XCTAssertGreaterThanOrEqual(mockDelegate.spaceChangeCallCount, 0)
+    func testRealServiceIntegration() {
+        // Test with real Core Graphics Service
+        let realService = RealCoreGraphicsService()
+        let realMonitor = SpaceMonitor(coreGraphicsService: realService)
+        let realDelegate = MockSpaceMonitorDelegate()
+        realMonitor.delegate = realDelegate
+
+        // Verify initialization
+        XCTAssertNotNil(realMonitor, "Should initialize with real service")
+        XCTAssertGreaterThanOrEqual(realMonitor.getCurrentSpaceNumber(), 1, "Should have valid initial space")
+
+        // Note: We can't reliably test actual space changes in a unit test
+        // as it would require UI interaction with Mission Control
     }
 
-    func testManualSpaceChange() {
-        // Test manual space setting
-        mockSpaceMonitor.setCurrentSpace(3)
-        XCTAssertEqual(mockSpaceMonitor.getCurrentSpaceNumber(), 3)
-        
-        // Verify delegate was called
-        XCTAssertEqual(mockDelegate.spaceChangeCallCount, 1)
-        XCTAssertEqual(mockDelegate.lastSpaceChange?.to, 3)
+    func testDelegateWeakReferenceInIntegration() {
+        // Test that delegate is properly released when no longer referenced
+        var weakDelegate: MockSpaceMonitorDelegate? = MockSpaceMonitorDelegate()
+        spaceMonitor.delegate = weakDelegate
+
+        XCTAssertNotNil(spaceMonitor.delegate, "Delegate should be set")
+
+        // Release delegate
+        weakDelegate = nil
+
+        XCTAssertNil(spaceMonitor.delegate, "Delegate should be nil after release (weak reference)")
     }
 
-    func testMultipleSpaceChanges() {
-        // Test multiple space changes
-        mockSpaceMonitor.setCurrentSpace(2)
-        mockSpaceMonitor.setCurrentSpace(4)
-        mockSpaceMonitor.setCurrentSpace(1)
-        
-        // Verify all changes were recorded
-        XCTAssertEqual(mockDelegate.spaceChangeCallCount, 3)
-        XCTAssertEqual(mockDelegate.allSpaceChanges.count, 3)
+    func testMockServiceCallCounting() {
+        // Test that mock service tracks method calls correctly
+        XCTAssertEqual(mockCoreGraphicsService.getCurrentSpaceFromDefaultsCallCount, 1, "Should call getCurrentSpaceFromDefaults during init")
+        XCTAssertEqual(mockCoreGraphicsService.detectActualSpaceCallCount, 0, "Should not call detectActualSpace during init")
     }
 
-    func testSpaceChangeNotificationHandling() {
-        // Test that space change notifications are handled
-        mockSpaceMonitor.updateCurrentSpace()
-        
-        // Verify the method executes without crashing
-        XCTAssertTrue(true)
+    func testMultipleMonitorsWithSameService() {
+        // Test creating multiple monitors with the same service
+        let service = MockCoreGraphicsService()
+        service.currentSpaceFromDefaults = 2
+
+        let monitor1 = SpaceMonitor(coreGraphicsService: service)
+        let monitor2 = SpaceMonitor(coreGraphicsService: service)
+
+        XCTAssertEqual(monitor1.getCurrentSpaceNumber(), 2, "Monitor 1 should get space 2")
+        XCTAssertEqual(monitor2.getCurrentSpaceNumber(), 2, "Monitor 2 should get space 2")
     }
 }
 
-class FileBasedSpaceNotifierTests: XCTestCase {
-    var spaceNotifier: FileBasedSpaceNotifier!
-    let testFileURL = URL(fileURLWithPath: "/tmp/test-space-agent-trigger")
+class LoggingTests: XCTestCase {
+    let testLogPath = "/tmp/spaceagent_test_debug.log"
 
     override func setUp() {
         super.setUp()
-        spaceNotifier = FileBasedSpaceNotifier()
-        
-        // Clean up any existing test file
-        try? FileManager.default.removeItem(at: testFileURL)
+        // Clean up test log file
+        try? FileManager.default.removeItem(atPath: testLogPath)
     }
 
     override func tearDown() {
-        spaceNotifier = nil
-        try? FileManager.default.removeItem(at: testFileURL)
+        // Clean up test log file
+        try? FileManager.default.removeItem(atPath: testLogPath)
         super.tearDown()
     }
 
-    func testSpaceNotifierInitialization() {
-        XCTAssertNotNil(spaceNotifier)
+    func testLogLevelComparison() {
+        // Test log level ordering
+        XCTAssertTrue(LogLevel.debug < LogLevel.info, "debug < info")
+        XCTAssertTrue(LogLevel.info < LogLevel.warning, "info < warning")
+        XCTAssertTrue(LogLevel.warning < LogLevel.error, "warning < error")
     }
 
-    func testNotifySpaceChange() {
-        // Test space change notification
-        let success = spaceNotifier.notifySpaceChange(to: 3, from: 1)
-        
-        // Verify notification was successful
-        XCTAssertTrue(success)
+    func testLogLevelPrefixes() {
+        // Test log level prefix strings
+        XCTAssertEqual(LogLevel.debug.prefix, "DEBUG")
+        XCTAssertEqual(LogLevel.info.prefix, "INFO")
+        XCTAssertEqual(LogLevel.warning.prefix, "WARN")
+        XCTAssertEqual(LogLevel.error.prefix, "ERROR")
     }
 
-    func testSpaceChangeFileContent() {
-        // Test that the file contains correct JSON
-        let success = spaceNotifier.notifySpaceChange(to: 2, from: 1)
-        XCTAssertTrue(success)
-        
-        // Verify the method executes without crashing
-        XCTAssertTrue(true)
+    func testLogLevelRawValues() {
+        // Test log level raw values for ordering
+        XCTAssertEqual(LogLevel.debug.rawValue, 0)
+        XCTAssertEqual(LogLevel.info.rawValue, 1)
+        XCTAssertEqual(LogLevel.warning.rawValue, 2)
+        XCTAssertEqual(LogLevel.error.rawValue, 3)
     }
 }

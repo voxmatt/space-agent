@@ -225,8 +225,7 @@ class SpaceMonitor {
         setupMonitoring()
 
         // Get initial space from UserDefaults (no CGS call needed)
-        if let realCGS = coreGraphicsService as? RealCoreGraphicsService,
-           let initialSpace = realCGS.getCurrentSpaceFromDefaults() {
+        if let initialSpace = coreGraphicsService.getCurrentSpaceFromDefaults() {
             currentSpaceNumber = initialSpace
             #if DEBUG
             print("SpaceMonitor: Initial space from UserDefaults: \(initialSpace)")

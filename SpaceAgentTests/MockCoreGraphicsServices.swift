@@ -1,98 +1,34 @@
 import Foundation
 @testable import SpaceAgent
 
+/// Mock implementation of CoreGraphicsServiceProtocol for testing
 class MockCoreGraphicsService: CoreGraphicsServiceProtocol {
-    private var _mockDisplaySpaces: NSArray = []
-    private var _mockActiveDisplayIdentifier: NSString = "Main"
-    var mockConnection: UInt32 = 12345
+    var spaceToReturn: Int = 1
+    var detectActualSpaceCallCount: Int = 0
+    var getCurrentSpaceFromDefaultsCallCount: Int = 0
+    var currentSpaceFromDefaults: Int? = 1
 
-    var displaySpaceCallCount = 0
-    var activeDisplayCallCount = 0
-    var connectionCallCount = 0
-
-    func defaultConnection() -> UInt32 {
-        connectionCallCount += 1
-        return mockConnection
-    }
-
-    func copyManagedDisplaySpaces(_ connection: UInt32) -> CFArray {
-        displaySpaceCallCount += 1
-        return _mockDisplaySpaces
-    }
-
-    func copyActiveMenuBarDisplayIdentifier(_ connection: UInt32) -> CFString {
-        activeDisplayCallCount += 1
-        return _mockActiveDisplayIdentifier
-    }
-    
     func detectActualSpace() -> Int {
-        return 1
+        detectActualSpaceCallCount += 1
+        return spaceToReturn
     }
 
-    func setupMockSpaces(currentSpaceID: Int, totalSpaces: Int = 3, displayIdentifier: String = "Main") {
-        var spaces: [[String: Any]] = []
-
-        for i in 1...totalSpaces {
-            spaces.append([
-                "ManagedSpaceID": i * 100,
-                "uuid": "space-\(i)-uuid"
-            ])
-        }
-
-        let mockDisplay: [String: Any] = [
-            "Display Identifier": displayIdentifier,
-            "Current Space": [
-                "ManagedSpaceID": currentSpaceID,
-                "uuid": "current-space-uuid"
-            ],
-            "Spaces": spaces
-        ]
-
-        _mockDisplaySpaces = [mockDisplay] as NSArray
-        _mockActiveDisplayIdentifier = displayIdentifier as NSString
-    }
-
-    func setupMockSpacesWithFullscreen(currentSpaceID: Int, totalSpaces: Int = 3, fullscreenSpaceID: Int? = nil) {
-        var spaces: [[String: Any]] = []
-
-        for i in 1...totalSpaces {
-            var space: [String: Any] = [
-                "ManagedSpaceID": i * 100,
-                "uuid": "space-\(i)-uuid"
-            ]
-
-            if let fullscreenID = fullscreenSpaceID, i * 100 == fullscreenID {
-                space["TileLayoutManager"] = ["someKey": "someValue"]
-            }
-
-            spaces.append(space)
-        }
-
-        let mockDisplay: [String: Any] = [
-            "Display Identifier": "Main",
-            "Current Space": [
-                "ManagedSpaceID": currentSpaceID,
-                "uuid": "current-space-uuid"
-            ],
-            "Spaces": spaces
-        ]
-
-        _mockDisplaySpaces = [mockDisplay] as NSArray
+    func getCurrentSpaceFromDefaults() -> Int? {
+        getCurrentSpaceFromDefaultsCallCount += 1
+        return currentSpaceFromDefaults
     }
 
     func reset() {
-        displaySpaceCallCount = 0
-        activeDisplayCallCount = 0
-        connectionCallCount = 0
-        _mockDisplaySpaces = []
-        _mockActiveDisplayIdentifier = "Main"
-        mockConnection = 12345
+        spaceToReturn = 1
+        detectActualSpaceCallCount = 0
+        getCurrentSpaceFromDefaultsCallCount = 0
+        currentSpaceFromDefaults = 1
     }
 }
 
-
+/// Mock implementation of SpaceMonitorDelegate for testing
 class MockSpaceMonitorDelegate: SpaceMonitorDelegate {
-    var spaceChangeCallCount = 0
+    var spaceChangeCallCount: Int = 0
     var lastSpaceChange: (to: Int, from: Int)?
     var allSpaceChanges: [(to: Int, from: Int)] = []
 
@@ -106,26 +42,5 @@ class MockSpaceMonitorDelegate: SpaceMonitorDelegate {
         spaceChangeCallCount = 0
         lastSpaceChange = nil
         allSpaceChanges.removeAll()
-    }
-}
-
-class MockSpaceMonitor: SpaceMonitor {
-    private var _currentSpaceNumber: Int = 1
-    
-    override func getCurrentSpaceNumber() -> Int {
-        return _currentSpaceNumber
-    }
-    
-    override func setCurrentSpace(_ spaceNumber: Int) {
-        let previousSpace = _currentSpaceNumber
-        _currentSpaceNumber = spaceNumber
-        
-        // Call delegate synchronously for testing
-        delegate?.spaceDidChange(to: spaceNumber, from: previousSpace)
-    }
-    
-    override func updateCurrentSpace() {
-        // Mock implementation - just call delegate synchronously
-        delegate?.spaceDidChange(to: _currentSpaceNumber, from: _currentSpaceNumber)
     }
 }
