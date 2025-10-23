@@ -33,10 +33,14 @@ After installation, SpaceAgent will automatically start monitoring your spaces a
 
 SpaceAgent uses Core Graphics Services APIs to monitor space changes:
 
-- Monitors `NSWorkspace.activeSpaceDidChangeNotification`
-- Uses `CGSGetActiveSpace` to detect current space
-- Dynamically discovers and maps space IDs to sequential numbers
+- Monitors `NSWorkspace.activeSpaceDidChangeNotification` for real-time space changes
+- Monitors application activation events for immediate space detection
+- Uses `CGSGetActiveSpace` to detect current space with timeout protection
+- Reads `com.apple.spaces` UserDefaults for initial space mapping
+- Dynamically discovers and maps new space IDs (O(1) operation)
+- Falls back to periodic polling (15s interval) as a safety net
 - Displays current space number in menu bar with 🚀 icon
+- Logs important events with ISO8601 timestamps and log levels (debug, info, warning, error)
 
 ## Uninstalling
 
@@ -53,6 +57,8 @@ sudo rm -rf /Applications/SpaceAgent.app
 - **Permission issues**: SpaceAgent may need Accessibility permissions in System Settings
 - **Menu bar icon not showing**: Check that the app is running with `ps aux | grep SpaceAgent`
 - **Space number not updating**: Check debug logs at `/tmp/spaceagent_debug.log`
+- **Multiple instances running**: Run `./cleanup.sh` to stop all instances before reinstalling
+- **Debug logging**: Logs are written with ISO8601 timestamps and include log levels (INFO, WARN, ERROR)
 
 ## Development
 
@@ -86,18 +92,25 @@ The project includes comprehensive testing with syntax validation and test execu
 
 ### Architecture
 
-The codebase is designed for testability with:
-- Protocol-based dependency injection
-- Mock objects for Core Graphics Services
+The codebase is designed for testability and performance with:
+- Protocol-based dependency injection for Core Graphics Services
+- Mock objects for testing without system dependencies
 - Separate concerns (monitoring vs. UI vs. integrations)
 - Delegate pattern for loose coupling
+- Efficient O(1) dynamic space discovery
+- Configurable log levels for production vs. development
+- Timeout protection for all CGS API calls
+- Background thread initialization to prevent UI blocking
 
 ## Technical Details
 
 This application is built with:
 - Swift 5.0
-- macOS 14.0+ (can be lowered if needed)
-- Core Graphics Services (CGS) APIs
-- NSWorkspace notifications
-- LaunchAgent for auto-start
+- macOS 13.0+ (minimum deployment target)
+- Core Graphics Services (CGS) private APIs
+- NSWorkspace notifications for space change detection
+- UserDefaults persistent domain reading for initial space mapping
+- LaunchAgent for auto-start on login
 - XCTest framework for comprehensive testing
+- ISO8601DateFormatter for efficient timestamp logging
+- Log level filtering (debug, info, warning, error)
