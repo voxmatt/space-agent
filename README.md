@@ -11,6 +11,7 @@ A background macOS agent that monitors virtual space changes and displays the cu
 - 🎨 Customizable menu bar icon
 - 🏁 Auto-starts on login
 - 📝 Configurable logging levels
+- 🔗 macOS Shortcuts integration (get current space)
 
 ## Installation
 
@@ -43,6 +44,54 @@ Click the menu bar icon and select "Settings..." to customize:
 Additional features in the Settings window:
 - **View Logs**: Open the debug log file in Console.app
 - **Reset to Defaults**: Restore all settings to their default values
+
+## Shortcuts Integration
+
+SpaceAgent integrates with macOS Shortcuts, allowing you to use the current space number in your automation workflows.
+
+### Available Actions:
+
+1. **Get Current Space** - Returns the current space number as an integer (e.g., `2`)
+2. **Get Current Space (Text)** - Returns the current space as formatted text (e.g., `"Space 2"`)
+
+### How to Use:
+
+1. Open the **Shortcuts** app on macOS
+2. Create a new shortcut or edit an existing one
+3. Click the **+** button to add an action
+4. Search for "**Space Agent**" or "**Get Current Space**"
+5. Add the action to your shortcut
+
+### Example Shortcuts:
+
+**Simple Space Display:**
+```
+1. Get Current Space (Text) from SpaceAgent
+2. Show Notification with result
+```
+
+**Conditional Actions by Space:**
+```
+1. Get Current Space from SpaceAgent
+2. If [Current Space] is [2]
+   - Do something specific to Space 2
+3. Otherwise
+   - Do something else
+```
+
+**Log Space Changes:**
+```
+1. Get Current Space (Text) from SpaceAgent
+2. Append to File [result + timestamp]
+```
+
+### Voice Commands:
+
+You can also use Siri to trigger shortcuts that use SpaceAgent:
+- "Hey Siri, what space am I on?"
+- "Hey Siri, current space number"
+
+Just create a shortcut with the SpaceAgent action and give it a name that Siri can recognize.
 
 ## How It Works
 

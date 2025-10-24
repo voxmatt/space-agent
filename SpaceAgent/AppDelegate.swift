@@ -54,6 +54,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SpaceMonitorDelegate {
                     // Update menu bar with the actual detected space
                     let currentSpace = self.spaceMonitor.getCurrentSpaceNumber()
                     self.updateStatusBarTitle(with: currentSpace)
+
+                    // Save initial space to UserDefaults for App Intents
+                    UserDefaults.standard.set(currentSpace, forKey: "currentSpaceNumber")
+
                     #if DEBUG
                     print("AppDelegate: Initial space from monitor: \(currentSpace)")
                     #endif
@@ -151,6 +155,10 @@ class AppDelegate: NSObject, NSApplicationDelegate, SpaceMonitorDelegate {
 
     func spaceDidChange(to spaceNumber: Int, from previousSpace: Int) {
         updateStatusBarTitle(with: spaceNumber)
+
+        // Save current space to UserDefaults for App Intents
+        UserDefaults.standard.set(spaceNumber, forKey: "currentSpaceNumber")
+
         #if DEBUG
         print("Space changed from \(previousSpace) to \(spaceNumber)")
         #endif

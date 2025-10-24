@@ -11,6 +11,7 @@
 		AA1000000001 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000000 /* AppDelegate.swift */; };
 		AA1000000002 /* SpaceMonitor.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000020 /* SpaceMonitor.swift */; };
 		AA1000000003 /* SettingsWindowController.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000030 /* SettingsWindowController.swift */; };
+		AA1000000004 /* AppIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1000000040 /* AppIntents.swift */; };
 		AA1000000005 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = AA1000000010 /* Assets.xcassets */; };
 		AA1000000006 /* MainMenu.xib in Resources */ = {isa = PBXBuildFile; fileRef = AA1000000011 /* MainMenu.xib */; };
 		AA2000000001 /* SpaceAgentTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA2000000000 /* SpaceAgentTests.swift */; };
@@ -36,6 +37,7 @@
 		AA1000000012 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		AA1000000020 /* SpaceMonitor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceMonitor.swift; sourceTree = "<group>"; };
 		AA1000000030 /* SettingsWindowController.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SettingsWindowController.swift; sourceTree = "<group>"; };
+		AA1000000040 /* AppIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppIntents.swift; sourceTree = "<group>"; };
 		AA1000000101 /* SpaceAgent.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = SpaceAgent.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		AA2000000000 /* SpaceAgentTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceAgentTests.swift; sourceTree = "<group>"; };
 		AA2000000010 /* SpaceMonitorTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SpaceMonitorTests.swift; sourceTree = "<group>"; };
@@ -86,6 +88,7 @@
 				AA1000000000 /* AppDelegate.swift */,
 				AA1000000020 /* SpaceMonitor.swift */,
 				AA1000000030 /* SettingsWindowController.swift */,
+				AA1000000040 /* AppIntents.swift */,
 				AA1000000010 /* Assets.xcassets */,
 				AA1000000011 /* MainMenu.xib */,
 				AA1000000012 /* Info.plist */,
@@ -208,6 +211,7 @@
 				AA1000000001 /* AppDelegate.swift in Sources */,
 				AA1000000002 /* SpaceMonitor.swift in Sources */,
 				AA1000000003 /* SettingsWindowController.swift in Sources */,
+				AA1000000004 /* AppIntents.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
