@@ -154,13 +154,18 @@ class AppDelegate: NSObject, NSApplicationDelegate, SpaceMonitorDelegate {
     }
 
     func spaceDidChange(to spaceNumber: Int, from previousSpace: Int) {
+        writeToDebugLog("=== AppDelegate.spaceDidChange called: \(previousSpace) -> \(spaceNumber) ===", level: .info)
+
         updateStatusBarTitle(with: spaceNumber)
 
         // Save current space to UserDefaults for App Intents
         UserDefaults.standard.set(spaceNumber, forKey: "currentSpaceNumber")
 
-        #if DEBUG
-        print("Space changed from \(previousSpace) to \(spaceNumber)")
-        #endif
+        writeToDebugLog("About to call triggerShortcut...", level: .info)
+
+        // Trigger shortcut if enabled
+        SettingsWindowController.triggerShortcut(withSpaceNumber: spaceNumber)
+
+        writeToDebugLog("triggerShortcut call completed", level: .info)
     }
 }

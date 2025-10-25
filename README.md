@@ -40,6 +40,8 @@ Click the menu bar icon and select "Settings..." to customize:
 - **Menu Bar Icon**: Change the emoji or text shown in the menu bar (default: 🚀)
 - **Polling Interval**: Adjust how often the app checks for space changes (5-60 seconds, default: 15)
 - **Log Level**: Set minimum logging level for debug logs (Debug, Info, Warning, Error)
+- **Trigger Shortcut on Space Change**: Enable automatic shortcut execution when switching spaces
+- **Shortcut Name**: Name of the shortcut to trigger (receives space number as input)
 
 Additional features in the Settings window:
 - **View Logs**: Open the debug log file in Console.app
@@ -92,6 +94,98 @@ You can also use Siri to trigger shortcuts that use SpaceAgent:
 - "Hey Siri, current space number"
 
 Just create a shortcut with the SpaceAgent action and give it a name that Siri can recognize.
+
+## Using Space Changes as Triggers
+
+SpaceAgent can automatically trigger a Shortcuts workflow every time you switch spaces, effectively turning space changes into automation triggers.
+
+### How to Set Up:
+
+1. **Create Your Shortcut**:
+   - Open the **Shortcuts** app
+   - Create a new shortcut with the actions you want to run
+   - Give it a name (e.g., "OnSpaceChange")
+   - The shortcut will receive the space number as input
+
+2. **Enable in SpaceAgent Settings**:
+   - Click the SpaceAgent menu bar icon
+   - Select "Settings..."
+   - Check "**Trigger Shortcut on Space Change**"
+   - Enter the exact name of your shortcut
+   - Click "Close"
+
+3. **Test It**:
+   - Switch to a different space
+   - Your shortcut will run automatically!
+
+### Implementation Details:
+
+SpaceAgent uses Apple's official Shortcuts URL scheme (`shortcuts://run-shortcut`) to trigger your shortcut:
+- Runs **every time** you switch spaces
+- Passes the **space number** (e.g., 2) as text input to your shortcut
+- Works **silently in the background** (no UI interruption)
+- **No polling required** - triggers instantly on space change
+
+### Example Use Cases:
+
+**1. Notify on Space Change:**
+```
+Shortcut: "OnSpaceChange"
+Actions:
+1. Receive [Shortcut Input] as text
+2. Show notification "Switched to Space [Shortcut Input]"
+```
+
+**2. Conditional Actions by Space:**
+```
+Shortcut: "SpaceAutomation"
+Actions:
+1. Receive [Shortcut Input] as text
+2. If [Shortcut Input] equals "1"
+   → Set Focus to "Work"
+3. If [Shortcut Input] equals "2"
+   → Set Focus to "Personal"
+4. If [Shortcut Input] equals "3"
+   → Launch Music app
+```
+
+**3. Log Space Activity:**
+```
+Shortcut: "LogSpaces"
+Actions:
+1. Receive [Shortcut Input] as text
+2. Get current date
+3. Append "[date] - Space [Shortcut Input]" to file
+```
+
+**4. Dynamic Desktop Wallpapers:**
+```
+Shortcut: "SpaceWallpaper"
+Actions:
+1. Receive [Shortcut Input] as text
+2. If [Shortcut Input] equals "1"
+   → Set wallpaper to "work-bg.jpg"
+3. If [Shortcut Input] equals "2"
+   → Set wallpaper to "personal-bg.jpg"
+```
+
+**5. Launch Apps by Space:**
+```
+Shortcut: "SpaceLauncher"
+Actions:
+1. Receive [Shortcut Input] as text
+2. If [Shortcut Input] equals "2"
+   → Open app "Safari"
+3. If [Shortcut Input] equals "3"
+   → Open app "Terminal"
+```
+
+### Tips:
+
+- **Keep it lightweight**: Shortcuts run synchronously, so avoid long-running actions
+- **Test first**: Test your shortcut manually before enabling auto-trigger
+- **Debug**: Check Shortcuts app notification settings if shortcuts don't appear to run
+- **Disable when not needed**: Turn off the trigger in Settings if you're not using it
 
 ## How It Works
 

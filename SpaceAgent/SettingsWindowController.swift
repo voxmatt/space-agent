@@ -8,6 +8,8 @@ class SettingsWindowController: NSWindowController {
     private var pollingIntervalSlider: NSSlider!
     private var pollingIntervalLabel: NSTextField!
     private var logLevelPopup: NSPopUpButton!
+    private var enableShortcutCheckbox: NSButton!
+    private var shortcutNameTextField: NSTextField!
     private var versionLabel: NSTextField!
 
     // MARK: - Settings Keys
@@ -16,6 +18,8 @@ class SettingsWindowController: NSWindowController {
         static let menuBarIcon = "menuBarIcon"
         static let pollingInterval = "pollingInterval"
         static let logLevel = "logLevel"
+        static let enableShortcutTrigger = "enableShortcutTrigger"
+        static let shortcutName = "shortcutName"
     }
 
     // MARK: - Default Values
@@ -23,12 +27,14 @@ class SettingsWindowController: NSWindowController {
     static let defaultIcon = "🚀"
     static let defaultPollingInterval: Double = 15.0
     static let defaultLogLevel = "info"
+    static let defaultEnableShortcutTrigger = false
+    static let defaultShortcutName = ""
 
     // MARK: - Initialization
 
     convenience init() {
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 480, height: 360),
+            contentRect: NSRect(x: 0, y: 0, width: 500, height: 440),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -130,6 +136,32 @@ class SettingsWindowController: NSWindowController {
 
         yPosition -= 60
 
+        // Shortcut Trigger Setting
+        enableShortcutCheckbox = NSButton(checkboxWithTitle: "Trigger Shortcut on Space Change", target: self, action: #selector(shortcutTriggerChanged(_:)))
+        enableShortcutCheckbox.frame = NSRect(x: 180, y: yPosition, width: 300, height: 20)
+        contentView.addSubview(enableShortcutCheckbox)
+
+        yPosition -= 30
+
+        let shortcutLabel = NSTextField(labelWithString: "Shortcut Name:")
+        shortcutLabel.frame = NSRect(x: 20, y: yPosition, width: 150, height: 20)
+        shortcutLabel.alignment = .right
+        contentView.addSubview(shortcutLabel)
+
+        shortcutNameTextField = NSTextField(frame: NSRect(x: 180, y: yPosition - 2, width: 200, height: 24))
+        shortcutNameTextField.placeholderString = "Enter shortcut name"
+        shortcutNameTextField.target = self
+        shortcutNameTextField.action = #selector(shortcutNameChanged(_:))
+        contentView.addSubview(shortcutNameTextField)
+
+        let shortcutHint = NSTextField(labelWithString: "Name of the shortcut to run when switching spaces")
+        shortcutHint.font = NSFont.systemFont(ofSize: 10)
+        shortcutHint.textColor = .secondaryLabelColor
+        shortcutHint.frame = NSRect(x: 180, y: yPosition - 18, width: 300, height: 16)
+        contentView.addSubview(shortcutHint)
+
+        yPosition -= 50
+
         // Separator
         let separator = NSBox(frame: NSRect(x: 20, y: yPosition, width: 440, height: 1))
         separator.boxType = .separator
@@ -216,6 +248,14 @@ class SettingsWindowController: NSWindowController {
         default:
             logLevelPopup.selectItem(at: 1) // Default to Info
         }
+
+        // Load shortcut trigger settings
+        let enableTrigger = defaults.bool(forKey: SettingsKeys.enableShortcutTrigger)
+        enableShortcutCheckbox.state = enableTrigger ? .on : .off
+
+        let shortcutName = defaults.string(forKey: SettingsKeys.shortcutName) ?? SettingsWindowController.defaultShortcutName
+        shortcutNameTextField.stringValue = shortcutName
+        shortcutNameTextField.isEnabled = enableTrigger
     }
 
     private func saveSettings() {
@@ -232,6 +272,10 @@ class SettingsWindowController: NSWindowController {
         let logLevelIndex = logLevelPopup.indexOfSelectedItem
         let logLevels = ["debug", "info", "warning", "error"]
         defaults.set(logLevels[logLevelIndex], forKey: SettingsKeys.logLevel)
+
+        // Save shortcut trigger settings
+        defaults.set(enableShortcutCheckbox.state == .on, forKey: SettingsKeys.enableShortcutTrigger)
+        defaults.set(shortcutNameTextField.stringValue, forKey: SettingsKeys.shortcutName)
 
         // Notify that settings changed
         NotificationCenter.default.post(name: NSNotification.Name("SettingsChanged"), object: nil)
@@ -253,6 +297,15 @@ class SettingsWindowController: NSWindowController {
     }
 
     @objc private func logLevelChanged(_ sender: NSPopUpButton) {
+        saveSettings()
+    }
+
+    @objc private func shortcutTriggerChanged(_ sender: NSButton) {
+        shortcutNameTextField.isEnabled = (sender.state == .on)
+        saveSettings()
+    }
+
+    @objc private func shortcutNameChanged(_ sender: NSTextField) {
         saveSettings()
     }
 
@@ -289,6 +342,9 @@ class SettingsWindowController: NSWindowController {
             pollingIntervalSlider.doubleValue = SettingsWindowController.defaultPollingInterval
             updatePollingIntervalLabel(SettingsWindowController.defaultPollingInterval)
             logLevelPopup.selectItem(at: 1) // Info
+            enableShortcutCheckbox.state = SettingsWindowController.defaultEnableShortcutTrigger ? .on : .off
+            shortcutNameTextField.stringValue = SettingsWindowController.defaultShortcutName
+            shortcutNameTextField.isEnabled = SettingsWindowController.defaultEnableShortcutTrigger
 
             saveSettings()
         }
@@ -311,5 +367,54 @@ class SettingsWindowController: NSWindowController {
 
     static func getLogLevel() -> String {
         return UserDefaults.standard.string(forKey: SettingsKeys.logLevel) ?? defaultLogLevel
+    }
+
+    static func isShortcutTriggerEnabled() -> Bool {
+        return UserDefaults.standard.bool(forKey: SettingsKeys.enableShortcutTrigger)
+    }
+
+    static func getShortcutName() -> String {
+        return UserDefaults.standard.string(forKey: SettingsKeys.shortcutName) ?? defaultShortcutName
+    }
+
+    static func triggerShortcut(withSpaceNumber spaceNumber: Int) {
+        writeToDebugLog("triggerShortcut: called with space number \(spaceNumber)", level: .info)
+
+        guard isShortcutTriggerEnabled() else {
+            writeToDebugLog("triggerShortcut: trigger is disabled", level: .info)
+            return
+        }
+
+        let shortcutName = getShortcutName()
+        writeToDebugLog("triggerShortcut: shortcut name = '\(shortcutName)'", level: .info)
+
+        guard !shortcutName.isEmpty else {
+            writeToDebugLog("triggerShortcut: shortcut name is empty", level: .info)
+            return
+        }
+
+        // Encode the shortcut name for URL
+        guard let encodedName = shortcutName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
+            writeToDebugLog("triggerShortcut: failed to encode shortcut name", level: .error)
+            return
+        }
+
+        // Build the Shortcuts URL scheme with the space number as input
+        // Use the text parameter to pass the space number directly to the shortcut
+        let urlString = "shortcuts://run-shortcut?name=\(encodedName)&input=text&text=\(spaceNumber)"
+
+        writeToDebugLog("triggerShortcut: URL string = '\(urlString)'", level: .info)
+
+        guard let url = URL(string: urlString) else {
+            writeToDebugLog("triggerShortcut: failed to create URL from string", level: .error)
+            return
+        }
+
+        // Open the URL to trigger the shortcut
+        writeToDebugLog("triggerShortcut: opening URL...", level: .info)
+
+        let success = NSWorkspace.shared.open(url)
+
+        writeToDebugLog("triggerShortcut: open result = \(success)", level: .info)
     }
 }
