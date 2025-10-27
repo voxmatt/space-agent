@@ -393,28 +393,27 @@ class SettingsWindowController: NSWindowController {
             return
         }
 
-        // Encode the shortcut name for URL
-        guard let encodedName = shortcutName.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) else {
-            writeToDebugLog("triggerShortcut: failed to encode shortcut name", level: .error)
-            return
+        // Use the shortcuts command-line tool to run shortcuts in the background
+        // This runs truly silently without opening the Shortcuts app
+        writeToDebugLog("triggerShortcut: Running shortcut via command line", level: .info)
+
+        // Run the shortcuts command in the background
+        DispatchQueue.global(qos: .utility).async {
+            let process = Process()
+            process.executableURL = URL(fileURLWithPath: "/usr/bin/shortcuts")
+            process.arguments = ["run", shortcutName, "-i", String(spaceNumber)]
+
+            // Redirect output to avoid blocking
+            let pipe = Pipe()
+            process.standardOutput = pipe
+            process.standardError = pipe
+
+            do {
+                try process.run()
+                writeToDebugLog("triggerShortcut: Command executed successfully", level: .info)
+            } catch {
+                writeToDebugLog("triggerShortcut: Failed to run command: \(error.localizedDescription)", level: .error)
+            }
         }
-
-        // Build the Shortcuts URL scheme with the space number as input
-        // Use the text parameter to pass the space number directly to the shortcut
-        let urlString = "shortcuts://run-shortcut?name=\(encodedName)&input=text&text=\(spaceNumber)"
-
-        writeToDebugLog("triggerShortcut: URL string = '\(urlString)'", level: .info)
-
-        guard let url = URL(string: urlString) else {
-            writeToDebugLog("triggerShortcut: failed to create URL from string", level: .error)
-            return
-        }
-
-        // Open the URL to trigger the shortcut
-        writeToDebugLog("triggerShortcut: opening URL...", level: .info)
-
-        let success = NSWorkspace.shared.open(url)
-
-        writeToDebugLog("triggerShortcut: open result = \(success)", level: .info)
     }
 }
